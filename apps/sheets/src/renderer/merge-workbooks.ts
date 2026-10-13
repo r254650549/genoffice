@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 /**
  * Merge workbooks: pick one or more spreadsheet files and append every sheet
  * to the current workbook.
@@ -87,7 +88,7 @@ async function readSourceSheet(
     // poll until the chunk's rows are covered or the source stops indexing,
     // otherwise unindexed rows would be silently dropped.
     const deadline = Date.now() + 120_000
-    let result = await window.desktopApi.readWorkbookRange({
+    let result = await getOfficeHost().readWorkbookRange({
       sessionId: file.sessionId,
       sheetId: sheet.id,
       range: { startRow, endRow, startColumn: 0, endColumn: columns - 1 },
@@ -98,7 +99,7 @@ async function readSourceSheet(
     ) {
       if (Date.now() > deadline) throw new Error(t('appMergeWorkbooksFailed'))
       await new Promise((resolve) => setTimeout(resolve, 400))
-      result = await window.desktopApi.readWorkbookRange({
+      result = await getOfficeHost().readWorkbookRange({
         sessionId: file.sessionId,
         sheetId: sheet.id,
         range: { startRow, endRow, startColumn: 0, endColumn: columns - 1 },
@@ -289,7 +290,7 @@ export async function mergeSourcesIntoCurrent(
     return { importedSheets, files: sources.length, sheetNames }
   } finally {
     for (const file of sources) {
-      void window.desktopApi.closeWorkbook(file.sessionId).catch(() => {})
+      void getOfficeHost().closeWorkbook(file.sessionId).catch(() => {})
     }
   }
 }
@@ -303,7 +304,7 @@ export async function mergeWorkbooksIntoCurrent(deps: MergeWorkbooksDeps): Promi
   }
   setMessage(t('appMergeWorkbooksPicking'))
   try {
-    const sources = await window.desktopApi.selectWorkbooksForMerge()
+    const sources = await getOfficeHost().selectWorkbooksForMerge()
     if (!sources || sources.length === 0) {
       setMessage(t('appOpenCanceled'))
       return
@@ -322,7 +323,7 @@ export async function mergeAttachedWorkbooks(
   if (workbookStructureLocked(deps.lazyWorkbookRef.current)) {
     throw new Error(t('appMergeWorkbooksLocked'))
   }
-  const sources = await window.desktopApi.openWorkbooksForMerge(paths)
+  const sources = await getOfficeHost().openWorkbooksForMerge(paths)
   if (!sources || sources.length === 0) throw new Error(t('appMergeWorkbooksFailed'))
   return mergeSourcesIntoCurrent(deps, sources)
 }

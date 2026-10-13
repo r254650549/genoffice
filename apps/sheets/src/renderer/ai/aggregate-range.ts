@@ -1,3 +1,4 @@
+import {getOfficeHost} from '../office-host'
 /**
  * aggregate_range tool implementation: batched statistics that never load the
  * grid or touch the formula engine — the supported path for distinct counts
@@ -392,7 +393,7 @@ export async function aggregateWorkbookRange(
         continue
       let result
       try {
-        result = await window.desktopApi.readWorkbookRange({
+        result = await getOfficeHost().readWorkbookRange({
           sessionId: state.file.sessionId,
           sheetId,
           range: batchBounds,

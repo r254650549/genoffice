@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 /**
  * Right-click menu and Arrange-tab commands for floating objects: z-order,
  * align/distribute, rotate/flip, cut/copy/paste, and the dialogs' applies.
@@ -481,7 +482,7 @@ async function copyVisual(
     // File pictures carry no bytes in the model; a cut must hold them
     // before the original goes, so the fetch completes first.
     try {
-      const media = await window.desktopApi.readWorkbookMedia({
+      const media = await getOfficeHost().readWorkbookMedia({
         sessionId: state.file.sessionId,
         visualId: visual.id,
       })

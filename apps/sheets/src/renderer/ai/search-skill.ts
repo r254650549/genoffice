@@ -1,3 +1,4 @@
+import {getOfficeHost} from '../office-host'
 import type { AgentSkill } from '@genoffice/agent-core'
 import { t } from '../i18n/locale'
 
@@ -38,7 +39,7 @@ export function createSearchSkill(): AgentSkill {
       if (!query) {
         return { output: 'query must not be empty', isError: true, summary: t('aiToolWebSearch') }
       }
-      const r = await window.desktopApi.webSearch(query, Number(call.input.maxResults) || 6)
+      const r = await getOfficeHost().webSearch(query, Number(call.input.maxResults) || 6)
       // a backend failure must not read as "no results" — the model would fabricate conclusions
       if (r.method === 'error') {
         return {

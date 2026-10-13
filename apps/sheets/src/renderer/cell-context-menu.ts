@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 /**
  * Excel's cell / row-header / column-header right-click entries that Univer's
  * context menu does not ship: Paste Special…, Filter ▸, Number Format ▸,
@@ -448,7 +449,7 @@ export function installCellContextMenu(runtime: UniverRuntime): IDisposable {
   )
   disposables.push(
     { dispose: () => localeSubscription.unsubscribe() },
-    { dispose: window.desktopApi.onLanguageChanged((lang) => loadMenuLocale(localeService, lang)) },
+    { dispose: getOfficeHost().onLanguageChanged((lang) => loadMenuLocale(localeService, lang)) },
   )
   const header = schemaFor(headerContextMenuLayout())
   injector.get(IMenuManagerService).mergeMenu({

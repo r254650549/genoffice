@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 import { keepActiveSheet } from './sheet-focus'
 /**
  * Univer runtime synchronization helpers for the sheets renderer.
@@ -1506,7 +1507,7 @@ export async function activateFormulaClosure(
       if (lazyWorkbookRef.current !== state) return
       let result
       try {
-        result = await window.desktopApi.readWorkbookFormulas({
+        result = await getOfficeHost().readWorkbookFormulas({
           sessionId: state.file.sessionId,
           sheetId: sheet.id,
         })
@@ -1558,7 +1559,7 @@ export async function activateFormulaClosure(
     for (const range of closureFetchRanges(cells)) {
       let result
       try {
-        result = await window.desktopApi.readWorkbookRange({
+        result = await getOfficeHost().readWorkbookRange({
           sessionId: state.file.sessionId,
           sheetId,
           range,
@@ -1925,7 +1926,7 @@ export async function recoverSidecarSession(state: LazyWorkbookState): Promise<b
     // re-opening the workbook itself, so it must adopt the file as a normal
     // session (with the usual csv/xls import handling) rather than opening a
     // second merge input that nothing would ever close.
-    const reopened = await window.desktopApi.reopenWorkbook(path)
+    const reopened = await getOfficeHost().reopenWorkbook(path)
     if (!reopened) return false
     // Only a recovery that produced a session counts: a cancelled prompt or a
     // transient open failure leaves the next crash signal free to retry.
@@ -1997,7 +1998,7 @@ async function readSheetRangeMappedOnce(
       startRow += batchRows
     ) {
       const endRow = Math.min(startRow + batchRows - 1, screenRange.endRow)
-      const batch = await window.desktopApi.readWorkbookRange({
+      const batch = await getOfficeHost().readWorkbookRange({
         sessionId: state.file.sessionId,
         sheetId: fileSheetId,
         range: { ...screenRange, startRow, endRow },
@@ -2014,7 +2015,7 @@ async function readSheetRangeMappedOnce(
     if (!raw) {
       // Degenerate empty range (endRow < startRow): let the sidecar answer,
       // preserving the pre-batching behavior for out-of-contract input.
-      raw = await window.desktopApi.readWorkbookRange({
+      raw = await getOfficeHost().readWorkbookRange({
         sessionId: state.file.sessionId,
         sheetId: fileSheetId,
         range: screenRange,
@@ -2050,7 +2051,7 @@ async function readSheetRangeMappedOnce(
   let raw: WorkbookRangeResult | null = null
   for (let startRow = fileRange.startRow; startRow <= fileRange.endRow; startRow += batchRows) {
     const endRow = Math.min(startRow + batchRows - 1, fileRange.endRow)
-    const batch = await window.desktopApi.readWorkbookRange({
+    const batch = await getOfficeHost().readWorkbookRange({
       sessionId: state.file.sessionId,
       sheetId: fileSheetId,
       range: { ...fileRange, startRow, endRow },
@@ -2606,7 +2607,7 @@ async function recalcFormulaCellKeys(
 ): Promise<ReadonlySet<number> | null> {
   const cached = state.recalc.formulaCells.get(sheetId)
   if (cached) return cached
-  const result = await window.desktopApi.readWorkbookFormulas({
+  const result = await getOfficeHost().readWorkbookFormulas({
     sessionId: state.file.sessionId,
     sheetId,
   })
@@ -2709,7 +2710,7 @@ async function runFormulaRecalc(
       return
     }
     const windowComplete = reads.length === closureFetchRanges(keys).length
-    const result = await window.desktopApi.recalcWorkbook({
+    const result = await getOfficeHost().recalcWorkbook({
       sessionId: state.file.sessionId,
       edits,
       reads: reads.map((range) => ({ sheetId, range })),
@@ -5826,7 +5827,7 @@ async function preloadEntireWorkbookInner(
       }
       let result
       try {
-        result = await window.desktopApi.readWorkbookRange({
+        result = await getOfficeHost().readWorkbookRange({
           sessionId: state.file.sessionId,
           sheetId,
           range,
@@ -5839,7 +5840,7 @@ async function preloadEntireWorkbookInner(
         ) {
           await new Promise((resolve) => setTimeout(resolve, 150))
           guard += 1
-          result = await window.desktopApi.readWorkbookRange({
+          result = await getOfficeHost().readWorkbookRange({
             sessionId: state.file.sessionId,
             sheetId,
             range,
@@ -6032,7 +6033,7 @@ export async function ensureSheetFileState(
     if (lazyWorkbookRef.current !== state) return false
     let result: WorkbookRangeResult
     try {
-      result = await window.desktopApi.readWorkbookRange({
+      result = await getOfficeHost().readWorkbookRange({
         sessionId: state.file.sessionId,
         sheetId,
         range,
@@ -7092,7 +7093,7 @@ async function readCachedRange(
   const deadline = Date.now() + 15_000
   try {
     for (;;) {
-      const result = await window.desktopApi.readWorkbookRange({
+      const result = await getOfficeHost().readWorkbookRange({
         sessionId: state.file.sessionId,
         sheetId,
         range,

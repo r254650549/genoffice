@@ -1,9 +1,11 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createImageSkill } from '../src/renderer/ai/image-skill'
 
 function stubDesktopApi(api: Record<string, unknown>): void {
   vi.stubGlobal('window', { desktopApi: api })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
 }
 
 afterEach(() => {

@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { precheckStructuralDeletes } from '../src/renderer/op-executor'
@@ -44,6 +45,7 @@ function stubFormulaOn(sheetRow: number): void {
       }),
     },
   }
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
 }
 
 const op = (row: number, count = 1) =>

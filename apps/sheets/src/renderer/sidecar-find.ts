@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 /**
  * Find over a streamed workbook's file cells, executed by the sidecar's
  * `find_cells` over its chunk index instead of paging cell JSON into the
@@ -83,7 +84,7 @@ export async function findSheetCellsInFile(
     if (!alive()) return { complete: false, capped: false, matches }
     let page
     try {
-      page = await window.desktopApi.findWorkbookCells({
+      page = await getOfficeHost().findWorkbookCells({
         sessionId: state.file.sessionId,
         sheetId: fileSheetId,
         ...query,

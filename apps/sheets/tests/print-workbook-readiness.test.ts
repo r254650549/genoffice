@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -54,6 +55,7 @@ describe('print and PDF workbook readiness coordination', () => {
         exportPdf: exportPdfMock,
       },
     })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
   })
 
   afterEach(() => {

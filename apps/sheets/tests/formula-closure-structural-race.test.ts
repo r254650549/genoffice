@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { activateFormulaClosure } from '../src/renderer/univer-sync'
@@ -97,6 +98,7 @@ function stubDesktopApi(onRangeRead: (call: number) => void): void {
       },
     },
   }
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
 }
 
 describe('activateFormulaClosure structural-edit race', () => {

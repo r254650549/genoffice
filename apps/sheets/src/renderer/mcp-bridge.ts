@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 import { z } from 'zod'
 import type { McpCommandMessage } from '../shared/desktop-api'
 import {
@@ -49,7 +50,7 @@ export interface McpSheetHandlers {
 }
 
 export function installSheetsMcpBridge(handlers: McpSheetHandlers): () => void {
-  const api = window.desktopApi
+  const api = getOfficeHost()
   if (typeof api?.onMcpCommand !== 'function') return () => {}
 
   /** one command at a time, in arrival order — applies and saves must not interleave */
@@ -120,8 +121,8 @@ export function installSheetsMcpBridge(handlers: McpSheetHandlers): () => void {
   }
 
   async function runCommand(message: McpCommandMessage): Promise<void> {
-    const reply = (ok: boolean, result?: unknown, error?: string): void => {
-      api.reportMcpResult({
+    const reply = async (ok: boolean, result?: unknown, error?: string): Promise<void> => {
+      await api.reportMcpResult({
         requestId: message.requestId,
         ok,
         ...(result !== undefined ? { result } : {}),
@@ -129,8 +130,15 @@ export function installSheetsMcpBridge(handlers: McpSheetHandlers): () => void {
       })
     }
     try {
+      await api.beforeMcpCommand?.(message)
       const payload = (message.payload ?? {}) as Record<string, unknown>
       switch (message.command) {
+        case 'describe_tools':
+          await reply(true,{commands:['read_sheet','apply_ops','save_sheet','undo','redo'],read_sheet:{addresses:'A1 references, e.g. ["A1", "B2"]',sheet:'optional worksheet name'},apply_ops:{ops:z.toJSONSchema(workbookOperationSchema,{io:'input'}),dryRun:'optional boolean'},save_sheet:{},undo:{},redo:{}})
+          return
+        case 'undo':case 'redo':
+          if(!api.history)throw new Error('History host unavailable')
+          api.history(message.command);await reply(true,{ok:true});return
         case 'read_sheet': {
           const addresses = Array.isArray(payload.addresses)
             ? payload.addresses.filter((a): a is string => typeof a === 'string')
@@ -140,20 +148,20 @@ export function installSheetsMcpBridge(handlers: McpSheetHandlers): () => void {
             typeof payload.sheetId === 'string' ? payload.sheetId : undefined,
           )
           if (!resolved.ok) {
-            reply(false, undefined, resolved.error)
+            await reply(false, undefined, resolved.error)
             return
           }
           if (addresses.length > 0) {
-            reply(true, { cells: handlers.readCells(addresses, resolved.sheetId) })
+            await reply(true, { cells: handlers.readCells(addresses, resolved.sheetId) })
           } else {
-            reply(true, { context: handlers.context() })
+            await reply(true, { context: handlers.context() })
           }
           return
         }
         case 'apply_ops': {
           const ops = Array.isArray(payload.ops) ? payload.ops : []
           if (ops.length === 0) {
-            reply(false, undefined, 'ops must be a non-empty array')
+            await reply(false, undefined, 'ops must be a non-empty array')
             return
           }
           // Worksheet names are the stable reference (the CLI's vocabulary);
@@ -161,7 +169,7 @@ export function installSheetsMcpBridge(handlers: McpSheetHandlers): () => void {
           // this process knows the open workbook's sheets.
           const named = normalizeSheetRefs(ops, handlers.sheets())
           if (!named.ok) {
-            reply(false, undefined, named.error)
+            await reply(false, undefined, named.error)
             return
           }
           // Same validation the built-in AI path applies (ai/tools.ts): without
@@ -169,37 +177,37 @@ export function installSheetsMcpBridge(handlers: McpSheetHandlers): () => void {
           // "Unknown sheet: undefined" from the planner instead of naming the op.
           const parsed = z.array(workbookOperationSchema).safeParse(named.ops)
           if (!parsed.success) {
-            reply(false, undefined, describeOpError(named.ops, parsed.error))
+            await reply(false, undefined, describeOpError(named.ops, parsed.error))
             return
           }
           const sheetId = primarySheetId(parsed.data)
           const dryRun = payload.dryRun === true
           if (sheetId !== undefined && !dryRun)
             handlers.focusSheet(sheetId, primaryCellOf(parsed.data))
-          reply(true, await handlers.applyOps(parsed.data, dryRun))
+          await reply(true, await handlers.applyOps(parsed.data, dryRun))
           return
         }
         case 'save_sheet': {
           const path = typeof payload.path === 'string' ? payload.path : ''
           const overwrite = payload.overwrite === true
           if (!path) {
-            reply(false, undefined, 'save_sheet needs an absolute path')
+            await reply(false, undefined, 'save_sheet needs an absolute path')
             return
           }
           const saved = await handlers.saveTo(path, overwrite)
           // a refused save must surface as an error so the agent keeps its session and can retry
           if (!saved.ok) {
-            reply(false, undefined, saved.error ?? 'the spreadsheet could not be saved')
+            await reply(false, undefined, saved.error ?? 'the spreadsheet could not be saved')
             return
           }
-          reply(true, saved)
+          await reply(true, saved)
           return
         }
         default:
-          reply(false, undefined, `unknown command: ${String(message.command)}`)
+          await reply(false, undefined, `unknown command: ${String(message.command)}`)
       }
     } catch (error: unknown) {
-      reply(false, undefined, error instanceof Error ? error.message : String(error))
+      await reply(false, undefined, error instanceof Error ? error.message : String(error))
     }
   }
 }

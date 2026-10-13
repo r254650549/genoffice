@@ -65,7 +65,7 @@ DOCX tool closure (2026-10-13):
   Parent evidence includes real-model edits, native undo/redo, cloud save/reopen,
   tracked-change accept/reject and DOCX XML round-trip checks.
 
-XLSX runtime extraction (2026-10-13, Web integration still pending):
+XLSX runtime extraction (2026-10-13; initial extraction checkpoint):
 
 - Move `writeWorkbookTo` unchanged out of `sheets-main.ts` into
   `workbook-save.ts`. Electron imports this same function; there is no second
@@ -93,3 +93,31 @@ Sheets viewport/context-menu fixes (2026-10-13):
   together with the cell context menu.
 - Existing grid-growth and menu suites: 19 tests pass. Parent browser evidence
   verifies AA-column editing and a single cell menu on a wide viewport.
+
+Sheets Web host checkpoint and clean-close fixes (2026-10-13):
+
+- Explicit `OfficeHost` bindings replace renderer preload calls. The complete
+  Sheets renderer, journal, native operations and undo stack remain upstream
+  implementations. Electron explicitly supplies the desktop host; existing
+  renderer test fixtures now configure the same host interface.
+- A local-socket workbook service runs beside the original Rust sidecar in the
+  user's existing execution environment. Requests enforce browser/document
+  ownership, retain mutation receipts and release closed sessions. Idle reads
+  are not cached as mutation results. Open sessions survive ordinary idle time;
+  the enclosing execution environment still owns its lifecycle and limits.
+- First explicit save uses native `save-as`, including an untouched blank
+  workbook. Recovery serialization of undo-to-pristine retains the native
+  validation rules. Engine reconnection uses verified immutable input bytes;
+  unknown mutation outcomes and lost chunk transfers are not replayed.
+- New-but-unnamed does not mean dirty. Close commits an active cell before
+  testing the journal; the outer host checks dirty before flushing. DOCX no
+  longer serializes a blank recovery copy merely because it has no saved file.
+- Browser acceptance in the parent proves blank XLSX explicit cloud save and
+  download, zero-edit XLSX/DOCX direct close, and canceling explicit Save As
+  followed by direct close. Agent, full lifecycle and compatibility acceptance
+  remain pending. The old already-open editor may need reopening to load this
+  static Web build; its existing draft is not discarded by these changes.
+- Sheets typecheck passes. Browser-independent Sheets suites pass with native
+  Windows-sidecar suites and platform-specific atomic-file fault tests excluded;
+  the real Linux native-engine verification is recorded separately. The exact
+  test counts and exclusions are recorded in the parent checkpoint.

@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 /**
  * Saving a CSV session that streams (too large for a full load): the
  * "keep this format?" question must come BEFORE the full-load guard —
@@ -20,6 +21,7 @@ beforeEach(() => {
   ;(globalThis as unknown as { window: unknown }).window = {
     desktopApi: { saveWorkbookEdits, writeWorkbookRecovery, confirmCsvSave },
   }
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
 })
 
 // confirmedCsvSaves is remembered per path across handleSave calls, so every

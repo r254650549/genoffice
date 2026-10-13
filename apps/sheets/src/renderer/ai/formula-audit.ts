@@ -1,3 +1,4 @@
+import {getOfficeHost} from '../office-host'
 /**
  * Formula auditing for the AI skill layer (trace_precedents /
  * trace_dependents). Precedents parse the target formula's references (same
@@ -382,7 +383,7 @@ async function collectSheetFormulas(
   if (!meta) return { cells, complete: true }
   let result
   try {
-    result = await window.desktopApi.readWorkbookFormulas({
+    result = await getOfficeHost().readWorkbookFormulas({
       sessionId: state.file.sessionId,
       sheetId: sheet.id,
     })

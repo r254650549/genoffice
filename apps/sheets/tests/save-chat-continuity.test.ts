@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleSave, type SaveContext } from '../src/renderer/save-actions'
 import { createEditJournal, recordSetRangeValues } from '../src/renderer/edit-journal'
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 
 const saveWorkbookEdits = vi.fn()
 const writeWorkbookRecovery = vi.fn()
@@ -16,6 +17,7 @@ beforeEach(() => {
   ;(globalThis as unknown as { window: unknown }).window = {
     desktopApi: { saveWorkbookEdits, writeWorkbookRecovery },
   }
+  configureOfficeHost({saveWorkbookEdits,writeWorkbookRecovery} as unknown as OfficeHost)
 })
 
 function ctxWith(): { ctx: SaveContext; openLazyWorkbook: ReturnType<typeof vi.fn> } {

@@ -12,6 +12,12 @@ const request=(sessionId:string,extra:Record<string,unknown>)=>workbookSaveReque
 try{
  const first=await runtime.open(),sheetId=first.sheets[0]!.id
  const original=await runtime.content(first.sessionId)
+ const blankSaved=await runtime.prepareSave(request(first.sessionId,{mode:'save-as'}))
+ const blankReopened=await runtime.open(await runtime.content(blankSaved.file.sessionId))
+ assert.equal(blankReopened.sheets.length,1)
+ assert.equal(blankReopened.sheets[0]!.name,'Sheet1')
+ await runtime.close(blankReopened.sessionId)
+ await runtime.close(blankSaved.file.sessionId)
  const saved=await runtime.prepareSave(request(first.sessionId,{
   edits:[{sheetId,row:0,column:0,writeValue:true,value:10,style:{bold:true}},{sheetId,row:1,column:0,writeValue:true,value:20},{sheetId,row:2,column:0,writeValue:true,value:30,formula:'SUM(A1:A2)'},{sheetId:'new-sheet',row:0,column:0,writeValue:true,value:'第二张工作表'}],
   sheetOps:[{kind:'add-sheet',sheetId:'new-sheet',name:'验收明细'}],sheetOrder:[sheetId,'new-sheet'],
@@ -35,6 +41,6 @@ try{
  await runtime.close(first.sessionId)
  await assert.rejects(runtime.content(first.sessionId),/XLSX_SESSION_EXPIRED/)
  await writeFile('/out/xlsx-runtime-sample.xlsx',savedBytes)
- await writeFile('/out/xlsx-runtime-result.json',JSON.stringify({nativeRust:true,formulaResult:calc.cells[0]?.number,sheets:opened.sheets.map(s=>s.name),unchangedParts:unchanged,checks:{immutableSave:true,rangeLimit:true,expiredSession:true,reopen:true}},null,2))
+ await writeFile('/out/xlsx-runtime-result.json',JSON.stringify({nativeRust:true,formulaResult:calc.cells[0]?.number,sheets:opened.sheets.map(s=>s.name),unchangedParts:unchanged,checks:{blankFirstSave:true,immutableSave:true,rangeLimit:true,expiredSession:true,reopen:true}},null,2))
  console.log('Native XLSX open/read/formula/style/multi-sheet/save/reopen passed.')
 }finally{await runtime.dispose()}

@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -320,6 +321,7 @@ describe('findWorkbookCells: lazy workbook via sidecar', () => {
       indexingComplete: true,
     })
     vi.stubGlobal('window', { desktopApi: { findWorkbookCells: sidecarFind } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     vi.mocked(readSheetRangeMapped).mockReset()
     const journal = new Map([
       ['sh1', new Map([['0:0', { row: 0, column: 0, hasValue: true, value: 'edited total' }]])],
@@ -362,6 +364,7 @@ describe('findWorkbookCells: lazy workbook via sidecar', () => {
       indexingComplete: true,
     })
     vi.stubGlobal('window', { desktopApi: { findWorkbookCells: sidecarFind } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     const capped = await findWorkbookCells_(options({ query: 'total', maxResults: 2 }))
     expect(capped.matches).toHaveLength(2)
     expect(capped.truncated).toBe(true)

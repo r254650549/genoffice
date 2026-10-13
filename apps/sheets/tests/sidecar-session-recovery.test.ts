@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { noteSidecarCrash, readSheetRangeMapped } from '../src/renderer/univer-sync'
 import type { LazyWorkbookState } from '../src/renderer/univer-state'
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 
 /// Both the Rust sidecar and sheets-main's own session guard reject an unknown
 /// session with this identical text (xlsx-engine lib.rs read_range;
@@ -105,6 +106,7 @@ describe('a sidecar crash no longer strands the grid on a dead session', () => {
     readWorkbookRange.mockClear()
     reopenWorkbook.mockClear()
     openWorkbooksForMerge.mockClear()
+    configureOfficeHost({ readWorkbookRange, reopenWorkbook, openWorkbooksForMerge } as unknown as OfficeHost)
     vi.stubGlobal('window', {
       desktopApi: { readWorkbookRange, reopenWorkbook, openWorkbooksForMerge },
     })
@@ -226,6 +228,7 @@ describe('a deliberate teardown is not a crash', () => {
     readWorkbookRange.mockClear()
     reopenWorkbook.mockClear()
     openWorkbooksForMerge.mockClear()
+    configureOfficeHost({ readWorkbookRange, reopenWorkbook, openWorkbooksForMerge } as unknown as OfficeHost)
     vi.stubGlobal('window', {
       desktopApi: { readWorkbookRange, reopenWorkbook, openWorkbooksForMerge },
     })

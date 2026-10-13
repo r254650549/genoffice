@@ -1794,6 +1794,11 @@ button.check-item:hover {
   grid-template-columns: 34px minmax(0, 1fr);
 }
 
+/* The Web host owns the conversation panel outside the editor iframe. */
+.app-shell.office-web .sheet-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .sheet-main {
   position: relative;
 }

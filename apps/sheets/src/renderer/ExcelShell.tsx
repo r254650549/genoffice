@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 import type { IFunctionInfo } from '@univerjs/engine-formula'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
@@ -548,7 +549,7 @@ export function ExcelShell({
   })
   // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
   const [isCopilotOpen, setIsCopilotOpen] = useState(() =>
-    aiPanelInitiallyOpen('ai-sheets-show-ai'),
+    getOfficeHost()?.kind==='web'?false:aiPanelInitiallyOpen('ai-sheets-show-ai'),
   )
   useEffect(() => {
     rememberAiPanelOpen('ai-sheets-show-ai', isCopilotOpen)
@@ -822,7 +823,7 @@ export function ExcelShell({
 
   return (
     <main
-      className={`app-shell ${isCopilotOpen ? '' : 'copilot-collapsed'}`}
+      className={`app-shell ${isCopilotOpen ? '' : 'copilot-collapsed'} ${getOfficeHost()?.kind==='web'?'office-web':''}`}
       inert={openingWorkbook}
       aria-busy={openingWorkbook}
     >
@@ -933,17 +934,18 @@ export function ExcelShell({
           onIsSelectionInPivot={onIsSelectionInPivot}
           onCommand={dispatchCommand}
           onAiRun={(nextPrompt) => {
+            if(getOfficeHost()?.kind==='web'){getOfficeHost().openAgent?.(nextPrompt);return}
             setIsCopilotOpen(true)
             onSend(nextPrompt)
           }}
           aiOpen={isCopilotOpen}
-          onAiToggle={() => setIsCopilotOpen((open) => !open)}
+          onAiToggle={() => getOfficeHost()?.kind==='web'?getOfficeHost().openAgent?.():setIsCopilotOpen((open) => !open)}
         />
       </header>
 
       {/* AI panel docks on the left, full height under the ribbon (unified with docs) */}
       <div className="sheet-body">
-        <AiChatPanel
+        {getOfficeHost()?.kind!=='web'&&<AiChatPanel
           isOpen={isCopilotOpen}
           hasContent={sheetHasContent}
           chat={chat}
@@ -975,7 +977,7 @@ export function ExcelShell({
           onCitation={onAiCitation}
           onExpand={() => setIsCopilotOpen(true)}
           onCollapse={() => setIsCopilotOpen(false)}
-        />
+        />}
         <div className="sheet-main">
           <section className="workbook-area">
             <div id="univer-container" className="spreadsheet" />
@@ -1002,6 +1004,7 @@ export function ExcelShell({
               range={aiScopeRange}
               onDismiss={onAiSelectionAskDismiss}
               onSend={(instruction) => {
+                if(getOfficeHost()?.kind==='web'){getOfficeHost().openAgent?.(instruction);return}
                 setIsCopilotOpen(true)
                 onSend(instruction)
               }}

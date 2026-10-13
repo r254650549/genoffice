@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { parseRange } from '@genoffice/xlsx-gateway/domain/cell-address'
@@ -126,6 +127,7 @@ function stubReadWorkbookRange(
         }),
     )
   vi.stubGlobal('window', { desktopApi: { readWorkbookRange } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
   return readWorkbookRange
 }
 

@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 /**
  * MCP worksheet addressing: the tools accept the CLI's NAME vocabulary
  * (`sheet` / `sourceSheet` / `targetSheet`), while the DSL underneath keys
@@ -216,6 +217,7 @@ describe('mcp bridge sheet addressing', () => {
         signalMcpReady: () => {},
       },
     }
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
   })
 
   function handlersWith(overrides: Partial<McpSheetHandlers> = {}): McpSheetHandlers {

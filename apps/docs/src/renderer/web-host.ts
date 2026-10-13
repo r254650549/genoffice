@@ -77,7 +77,9 @@ function flushDraft(): Promise<void> {
 }
 const session = await request('session', []) as {revision: number;readOnly:boolean;hasContent:boolean}
 revision = session.revision
-publishedRevision = session.hasContent ? session.revision : -1
+// An untouched new document is clean. First publication requires an explicit
+// save, rather than serializing a blank draft merely because it has no file.
+publishedRevision = session.revision
 const host: OfficeHost = {
   kind: 'web',
   get commandInFlight() {return commandInFlight},

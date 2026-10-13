@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IRange } from '@univerjs/core'
 import {
@@ -1153,6 +1154,7 @@ describe('sidecar find path', () => {
       ]),
     )
     vi.stubGlobal('window', { desktopApi: { findWorkbookCells } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     const journal = new Map([
       [
         's1',
@@ -1201,6 +1203,7 @@ describe('sidecar find path', () => {
       .fn()
       .mockResolvedValue(sidecarPage([{ row: 400, column: 2, value: 7, formula: '=NEEDLE()' }]))
     vi.stubGlobal('window', { desktopApi: { findWorkbookCells } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     const harness = facade(state({}))
     const inner = new FakeInnerModel([])
     harness.providers.add({ find: vi.fn().mockResolvedValue([inner]), terminate: vi.fn() })
@@ -1222,6 +1225,7 @@ describe('sidecar find path', () => {
   it('falls back to range paging when the sidecar rejects the command', async () => {
     const findWorkbookCells = vi.fn().mockRejectedValue(new Error('unsupported command'))
     vi.stubGlobal('window', { desktopApi: { findWorkbookCells } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     mockRead.mockResolvedValue(mapped([{ row: 500, column: 3, value: 'deep needle' }]))
     const harness = facade(state({}))
     const inner = new FakeInnerModel([])
@@ -1247,6 +1251,7 @@ describe('sidecar find path', () => {
       }),
     )
     vi.stubGlobal('window', { desktopApi: { findWorkbookCells } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     const harness = facade(state({ rowCount: 200_000 }))
     const inner = new FakeInnerModel([])
     harness.providers.add({ find: vi.fn().mockResolvedValue([inner]), terminate: vi.fn() })

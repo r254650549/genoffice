@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -85,6 +86,7 @@ describe('loadCrossHighlightPreference', () => {
   it('reads the stored flag', () => {
     const store = new Map<string, string>([['ai-sheets-cross-highlight', '1']])
     vi.stubGlobal('window', { localStorage: { getItem: (key: string) => store.get(key) ?? null } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     expect(loadCrossHighlightPreference()).toBe(true)
     store.set('ai-sheets-cross-highlight', '0')
     expect(loadCrossHighlightPreference()).toBe(false)

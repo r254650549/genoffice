@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 /**
  * The ⌘S save flow: serializes the edit journal and Univer-owned states
  * (filters, CF, DV, notes, defined names) into one saveWorkbookEdits call,
@@ -298,7 +299,7 @@ export async function handleSave(
   // An unsaved new workbook's Save is its first Save As, journal or not: a
   // quiet AutoSave may already have moved the work into the backing file.
   const firstSaveAs = mode === 'save' && state.file.unsavedNew === true && !quiet
-  if (total === 0 && mode !== 'save-as' && !restoreWriteBack && !firstSaveAs) {
+  if (total === 0 && mode !== 'save-as' && !restoreWriteBack && !firstSaveAs && !(mode==='recovery' && getOfficeHost()?.kind==='web')) {
     if (mode !== 'recovery') ctx.setMessage(t('appNoEditsToSave'))
     return { ok: false }
   }
@@ -314,7 +315,7 @@ export async function handleSave(
     // hatch unreachable. Streamed sessions that insist on CSV still get the
     // message (and are asked again next time instead of being remembered).
     if (!confirmedCsvSaves.has(csvPath)) {
-      const choice = await window.desktopApi.confirmCsvSave()
+      const choice = await getOfficeHost().confirmCsvSave()
       if (choice === 'cancel') {
         ctx.setMessage(t('appSaveCanceled'))
         return { ok: false }
@@ -360,7 +361,7 @@ export async function handleSave(
   // chunks first; the request then references the transfer instead.
   let staged: StagedEdits
   try {
-    staged = await stageEditsForSave(window.desktopApi, state.file.sessionId, edits)
+    staged = await stageEditsForSave(getOfficeHost(), state.file.sessionId, edits)
   } catch (error: unknown) {
     if (mode === 'recovery') return { ok: false }
     const message = stripIpcErrorWrapper(error instanceof Error ? error.message : '')
@@ -372,6 +373,11 @@ export async function handleSave(
   const payload = {
     sessionId: state.file.sessionId,
     mode: mode === 'recovery' ? ('save' as const) : mode,
+    // Web must publish an undo back to the unchanged snapshot too. The native
+    // schema already supports write-back without a new journal operation.
+    ...(mode === 'recovery' && total === 0 && getOfficeHost()?.kind === 'web'
+      ? { restoreWriteBack: true }
+      : {}),
     // MCP explicit-path save: main skips the Save-As dialog and enforces the
     // overwrite policy from these two fields
     ...(explicitTarget
@@ -408,9 +414,9 @@ export async function handleSave(
   if (mode === 'recovery') {
     // Best-effort; a failure only means this tick's copy is skipped — but an
     // unconsumed transfer must not sit in main-process memory until expiry.
-    const written = await window.desktopApi.writeWorkbookRecovery(payload).catch(async () => {
+    const written = await getOfficeHost().writeWorkbookRecovery(payload).catch(async () => {
       await abortStagedEditsTransfer(
-        window.desktopApi,
+        getOfficeHost(),
         state.file.sessionId,
         staged.editsTransferId,
       )
@@ -420,9 +426,11 @@ export async function handleSave(
   }
   try {
     ctx.setMessage(t('appSavingEdits', { count: total }))
-    const result = await window.desktopApi.saveWorkbookEdits({
+    const result = await getOfficeHost().saveWorkbookEdits({
       sessionId: state.file.sessionId,
-      mode,
+      // A new workbook's first save is Save As even with an empty journal.
+      // Ordinary empty saves are correctly refused by the native schema.
+      mode: firstSaveAs ? 'save-as' : mode,
       ...(restoreWriteBack ? { restoreWriteBack: true } : {}),
       ...(quiet ? { quiet: true } : {}),
       ...(csvContent === undefined ? {} : { csvContent }),
@@ -503,7 +511,7 @@ export async function handleSave(
     // carry undo history across them (and clears any stale stash).
     stashUndoCarry(null)
     try {
-      const second = await window.desktopApi.saveWorkbookEdits({
+      const second = await getOfficeHost().saveWorkbookEdits({
         sessionId: result.file.sessionId,
         mode: 'save',
         // an unsaved new workbook's quiet save writes its backing file in
@@ -570,7 +578,7 @@ export async function handleSave(
   } catch (error: unknown) {
     // The save may have failed before consuming the chunked transfer (e.g.
     // request validation); freeing it is a no-op when it was consumed.
-    await abortStagedEditsTransfer(window.desktopApi, state.file.sessionId, staged.editsTransferId)
+    await abortStagedEditsTransfer(getOfficeHost(), state.file.sessionId, staged.editsTransferId)
     const message = stripIpcErrorWrapper(error instanceof Error ? error.message : '')
     const failed = localizeSaveError(message) ?? (message || t('appSaveFailed'))
     ctx.setMessage(failed)

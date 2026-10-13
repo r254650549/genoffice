@@ -1,3 +1,4 @@
+import {getOfficeHost} from '../office-host'
 /// AI create_document, renderer side: xlsx/csv serialize one worksheet's
 /// display grid (values as shown, like the manual CSV export) and hand the
 /// text to the main process to write into the default save folder; docx/pdf/md/html
@@ -23,7 +24,7 @@ export async function createAiDocument(
     request.type === 'md' ||
     request.type === 'html'
   ) {
-    const result = await window.desktopApi.createDocument(request)
+    const result = await getOfficeHost().createDocument(request)
     if (!result.ok) return { ok: false, error: result.error ?? 'creating the document failed' }
     return {
       ok: true,
@@ -61,7 +62,7 @@ export async function createAiDocument(
   }
   const sheetName = sheet.getSheetName()
   const title = request.title?.trim() || sheetName
-  const result = await window.desktopApi.createDocument({
+  const result = await getOfficeHost().createDocument({
     type: request.type,
     title,
     content,

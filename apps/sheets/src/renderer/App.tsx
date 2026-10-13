@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 import { focusWorksheet } from './sheet-focus'
 import {
   activateFormulaClosure,
@@ -592,7 +593,8 @@ export function App({
   const [preview, setPreview] = useState<ChangePlan | null>(null)
   const [_revision, setRevision] = useState(0)
   const [workbookFile, setWorkbookFile] = useState<WorkbookFile | null>(null)
-  const [pendingEdits, setPendingEdits] = useState(0)
+  const [pendingEdits, setPendingEditsState] = useState(0)
+  const setPendingEdits = useCallback((value: number) => {getOfficeHost()?.documentChanged?.();setPendingEditsState(value)}, [])
   /// Whether any cell in the workbook has content — the ribbon's one-click AI
   /// action buttons are greyed out on a fully empty sheet.
   const [sheetHasContent, setSheetHasContent] = useState(false)
@@ -621,11 +623,11 @@ export function App({
   }, [workbookFile, recomputeSheetContent])
   // The close guard lives in the main process; keep it fed with the badge count.
   useEffect(() => {
-    window.desktopApi?.notifyPendingEdits?.(
+    getOfficeHost()?.notifyPendingEdits?.(
       pendingEditsForClose(pendingEdits, editingCellRef.current),
     )
   }, [pendingEdits])
-  const [autoSave, setAutoSave] = useAutoSavePref('ai-sheets-auto-save', window.desktopApi)
+  const [autoSave, setAutoSave] = useAutoSavePref('ai-sheets-auto-save', getOfficeHost())
   // Ref mirror for callbacks captured when an AI run starts
   const autoSaveRef = useRef(autoSave)
   autoSaveRef.current = autoSave
@@ -699,7 +701,7 @@ export function App({
   }, [])
   const [recoveryPrompt, setRecoveryPrompt] = useState<RecoveryPromptPayload | null>(null)
   useEffect(
-    () => window.desktopApi?.onRecoveryPrompt?.((prompt) => setRecoveryPrompt(prompt)) ?? undefined,
+    () => getOfficeHost()?.onRecoveryPrompt?.((prompt) => setRecoveryPrompt(prompt)) ?? undefined,
     [],
   )
   /// Streaming-mode filter gate: the filter panel builds
@@ -951,7 +953,7 @@ export function App({
     if (headlessExportStartedRef.current) return
     headlessExportStartedRef.current = true
     void (async () => {
-      const outPath = (await window.desktopApi?.consumeHeadlessExport?.()) ?? null
+      const outPath = (await getOfficeHost()?.consumeHeadlessExport?.()) ?? null
       if (!outPath) return
       const report = await runHeadlessRendererExport(
         outPath,
@@ -979,7 +981,7 @@ export function App({
         },
         (target) => handleExportPdfImpl(pageLayoutContext(), target),
       )
-      window.desktopApi?.headlessExportDone?.(report)
+      getOfficeHost()?.headlessExportDone?.(report)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per renderer; reads the latest state through refs
   }, [])
@@ -1056,7 +1058,7 @@ export function App({
   useEffect(() => {
     let alive = true
     const refresh = () => {
-      void window.desktopApi
+      void getOfficeHost()
         ?.aiGskStatus()
         .then((s) => {
           if (alive) gskLoggedInRef.current = !!s?.loggedIn
@@ -1105,7 +1107,7 @@ export function App({
   // name (the save path is synced by the main process)
   useEffect(
     () =>
-      window.desktopApi?.onWorkbookRenamed?.((newName) => {
+      getOfficeHost()?.onWorkbookRenamed?.((newName) => {
         setWorkbookFile((prev) => (prev ? { ...prev, name: newName } : prev))
       }) ?? (() => undefined),
     [],
@@ -1118,7 +1120,7 @@ export function App({
   // on purpose is not a crash and must not re-open anything.
   useEffect(
     () =>
-      window.desktopApi?.onSidecarCrashed?.(() => {
+      getOfficeHost()?.onSidecarCrashed?.(() => {
         noteSidecarCrash()
       }) ?? (() => undefined),
     [],
@@ -1525,7 +1527,7 @@ export function App({
           // gsk status rather than matching the localized error text — but only
           // when Genspark is the provider: a BYOK user's error (e.g. their own
           // provider's rate limit) must not advertise a Genspark sign-in (#1948)
-          void window.desktopApi
+          void getOfficeHost()
             .aiGskStatus()
             .then((status) => {
               if (status.loggedIn) return
@@ -1566,7 +1568,7 @@ export function App({
     const images: AgentImage[] = []
     const failures: string[] = []
     for (const att of imageAtts.slice(0, MAX_IMAGES_PER_MESSAGE)) {
-      const result = await window.desktopApi.readAttachmentImage(att.path)
+      const result = await getOfficeHost().readAttachmentImage(att.path)
       if (result.ok && result.base64 && result.mime) {
         images.push({ base64: result.base64, mime: result.mime })
       } else {
@@ -1623,16 +1625,16 @@ export function App({
   }
 
   async function handlePickAttachments(): Promise<void> {
-    mergeAttachments(await window.desktopApi.pickAttachments())
+    mergeAttachments(await getOfficeHost().pickAttachments())
   }
 
   async function handleAddAttachmentPaths(paths: readonly string[]): Promise<void> {
     if (paths.length === 0) return
-    mergeAttachments(await window.desktopApi.addAttachmentPaths([...paths]))
+    mergeAttachments(await getOfficeHost().addAttachmentPaths([...paths]))
   }
 
   async function handleAddPastedImage(data: ArrayBuffer, ext: string): Promise<void> {
-    mergeAttachments(await window.desktopApi.addPastedImage(data, ext))
+    mergeAttachments(await getOfficeHost().addPastedImage(data, ext))
   }
 
   function handleRemoveAttachment(path: string): void {
@@ -1718,9 +1720,9 @@ export function App({
   }
 
   useEffect(() => {
-    const loadSettings = () => void window.desktopApi.getAiSettings().then(setAiSettingsState)
+    const loadSettings = () => void getOfficeHost().getAiSettings().then(setAiSettingsState)
     loadSettings()
-    return window.desktopApi.onAiSettingsChanged?.(loadSettings)
+    return getOfficeHost().onAiSettingsChanged?.(loadSettings)
   }, [])
 
   useEffect(() => {
@@ -1824,8 +1826,8 @@ export function App({
       themeService.setDarkMode(isDarkTheme())
       crossHighlightRef.current?.refresh()
     }
-    const offThemeChanged = window.desktopApi?.onThemeChanged?.(applyUniverDark)
-    const offDocThemeChanged = window.desktopApi?.onDocumentThemeChanged?.(applyUniverDark)
+    const offThemeChanged = getOfficeHost()?.onThemeChanged?.(applyUniverDark)
+    const offDocThemeChanged = getOfficeHost()?.onDocumentThemeChanged?.(applyUniverDark)
     prefersDark.addEventListener('change', applyUniverDark)
     // Undo/redo stack occupancy: the QAT buttons grey out when there is nothing to apply
     const undoRedoService = runtime.univer.__getInjector().get(IUndoRedoService)
@@ -1881,12 +1883,12 @@ export function App({
     installFormulaStreamHold(runtime)
     // The window always starts blank now; still consume the one-shot
     // new-blank flag so it doesn't leak into the next workbook open.
-    void window.desktopApi?.consumeNewBlankWorkbook?.()
+    void getOfficeHost()?.consumeNewBlankWorkbook?.()
     // Pull any shell-queued workbook ourselves: the shell's 'open' nudge loop
     // gives up after 30s, and on slow dev cold starts Univer mounts later than
     // that — the tab would strand as a blank in-memory workbook (no save, no
     // shapes) with the queued file silently never opened.
-    void window.desktopApi?.hasQueuedWorkbook?.().then((queued) => {
+    void getOfficeHost()?.hasQueuedWorkbook?.().then((queued) => {
       if (queued) void handleInspectWorkbook()
     })
     // Univer 0.25.1 also badges text parseable as date/time, phone numbers, and
@@ -2048,7 +2050,7 @@ export function App({
       recordNoteChange(state.editJournal, sheetId)
       setPendingEdits(journalSize(state.editJournal))
     }
-    void window.desktopApi.getUserDisplayName?.().then((name) => threadStore.setAuthor(name))
+    void getOfficeHost().getUserDisplayName?.().then((name) => threadStore.setAuthor(name))
     // Univer's own UI (rule-management panels, dialogs) follows the app
     // language instead of hard-coded English.
     void applyUniverLocale(runtime, getLang())
@@ -2141,7 +2143,7 @@ export function App({
     // keystroke.
     const syncCellEditorPending = (): void => {
       const state = lazyWorkbookRef.current
-      window.desktopApi?.notifyPendingEdits?.(
+      getOfficeHost()?.notifyPendingEdits?.(
         pendingEditsForClose(state ? journalSize(state.editJournal) : 0, editingCellRef.current),
       )
     }
@@ -3118,11 +3120,11 @@ export function App({
     )
     // File-menu accelerators (⌘O/⌘S/⇧⌘S) arrive from the main process.
     const unsubscribeMenu =
-      window.desktopApi?.onMenuAction((action) => menuActionRef.current(action)) ??
+      getOfficeHost()?.onMenuAction((action) => menuActionRef.current(action)) ??
       (() => undefined)
     // Close guard chose Save: run the journal save and report the outcome.
     const unsubscribeCloseSave =
-      window.desktopApi?.onCloseSaveRequest?.(() => void closeSaveRef.current()) ??
+      getOfficeHost()?.onCloseSaveRequest?.(() => void closeSaveRef.current()) ??
       (() => undefined)
     const gridHost = document.getElementById('univer-container')
     const disposePictureTransfer = gridHost
@@ -3261,7 +3263,7 @@ export function App({
             ? journaled
             : state.hyperlinkTargets.get(worksheet.getSheetId())?.get(`${row}:${column}`)
         if (target?.startsWith('http')) {
-          void window.desktopApi.openExternal(target)
+          void getOfficeHost().openExternal(target)
         } else if (target?.startsWith('#')) {
           navigateToAnchor(runtime, target.slice(1), setMessage)
         }
@@ -3364,7 +3366,7 @@ export function App({
       lazyWorkbookRef.current = null
       clearLazyState(lazyState)
       if (lazyState) {
-        void window.desktopApi.closeWorkbook(lazyState.file.sessionId)
+        void getOfficeHost().closeWorkbook(lazyState.file.sessionId)
       }
       runtime.univer.dispose()
       univerRef.current = null
@@ -3556,7 +3558,7 @@ export function App({
         .find((name) => name.length > 0 && !DEFAULT_SHEET_NAME_RE.test(name))
       if (candidate) {
         try {
-          await window.desktopApi.autoRenameWorkbook(after.file.sessionId, candidate)
+          await getOfficeHost().autoRenameWorkbook(after.file.sessionId, candidate)
         } catch {
           // naming is best-effort; the save itself already succeeded
         }
@@ -4225,6 +4227,8 @@ export function App({
     opts?: { continueChat?: boolean; onInitialRangeLoaded?: () => void },
   ): Promise<boolean> {
     if (!(await commitActiveEditor())) return false
+    getOfficeHost()?.workbookLoading?.(true)
+    try {
     if (opts?.continueChat) chatContinuesRef.current = true
     const selected: WorkbookFile = {
       ...opened,
@@ -4245,7 +4249,7 @@ export function App({
     const previous = lazyWorkbookRef.current
     if (previous) {
       clearLazyState(previous)
-      void window.desktopApi.closeWorkbook(previous.file.sessionId).catch(() => undefined)
+      void getOfficeHost().closeWorkbook(previous.file.sessionId).catch(() => undefined)
     }
     if (demoVisualInstallTimerRef.current) {
       clearTimeout(demoVisualInstallTimerRef.current)
@@ -4328,7 +4332,7 @@ export function App({
     for (const sheet of selected.sheets) {
       for (const pivot of sheet.pivotTables) {
         if (pivot.cachePath === null) continue
-        void window.desktopApi
+        void getOfficeHost()
           .readPivotDefinition({
             sessionId: selected.sessionId,
             path: pivot.path,
@@ -4532,6 +4536,7 @@ export function App({
       opts?.onInitialRangeLoaded?.()
     }
     return true
+    } finally {getOfficeHost()?.workbookLoading?.(false)}
   }
 
   // A workbook loaded into an already-mounted view (the prewarmed spare) can
@@ -4574,10 +4579,10 @@ export function App({
       focusSheetGrid()
     }
     try {
-      if (!window.desktopApi) {
+      if (!getOfficeHost()) {
         throw new Error(t('appBridgeUnavailable'))
       }
-      const selected = await window.desktopApi.selectWorkbook()
+      const selected = await getOfficeHost().selectWorkbook()
       if (!selected) {
         setMessage(t('appOpenCanceled'))
         finishOpening()
@@ -4607,24 +4612,26 @@ export function App({
     if (mode === 'recovery' && gate.busy) return { ok: false }
     return gate.run(async () => {
       if (!(await commitActiveEditor())) return { ok: false }
-      return handleSaveImpl(saveContext(), mode, quiet, explicitTarget)
+      const web=getOfficeHost()?.kind==='web',inert=document.body.inert
+      if(web)document.body.inert=true
+      try{return await handleSaveImpl(saveContext(), mode, quiet, explicitTarget)}finally{if(web)document.body.inert=inert}
     })
   }
   closeSaveRef.current = async () => {
     if (!(await commitActiveEditor())) {
-      window.desktopApi?.reportCloseSaveResult?.(false)
+      getOfficeHost()?.reportCloseSaveResult?.(false)
       return
     }
     const state = lazyWorkbookRef.current
-    if (!state || journalSize(state.editJournal) === 0) {
-      window.desktopApi?.reportCloseSaveResult?.(true)
+    if (!state || journalSize(state.editJournal) === 0 && !state.file.unsavedNew && !state.file.restoredFromRecovery) {
+      getOfficeHost()?.reportCloseSaveResult?.(true)
       return
     }
     await handleSave('save')
     // handleSave swallows errors into the status bar; a drained journal
     // (fresh state after openLazyWorkbook) is the success signal.
     const after = lazyWorkbookRef.current
-    window.desktopApi?.reportCloseSaveResult?.(
+    getOfficeHost()?.reportCloseSaveResult?.(
       after === null || journalSize(after.editJournal) === 0,
     )
   }
@@ -4665,6 +4672,13 @@ export function App({
     }
   }
   handleSaveRef.current = handleSave
+  getOfficeHost()?.bindWorkbook?.({
+    commit:commitActiveEditor,
+    flush:async()=>{if(!await commitActiveEditor())return false;return (await handleSave('recovery',true)).ok},
+    dirty:()=>{const state=lazyWorkbookRef.current;return !!state&&(journalSize(state.editJournal)>0||state.file.restoredFromRecovery===true)},
+    save:async()=> (await handleSave('save')).ok,
+    undo:handleUndo,redo:handleRedo,
+  })
 
   // MCP visible-grid session (planning/mcp-server.md phase 2): the shell pushes
   // read/apply/save commands; they run through the same executors the built-in
@@ -4951,7 +4965,7 @@ export function App({
           prompt={recoveryPrompt}
           onChoose={(restore) => {
             setRecoveryPrompt(null)
-            window.desktopApi?.replyRecoveryPrompt?.(restore)
+            getOfficeHost()?.replyRecoveryPrompt?.(restore)
           }}
         />
       )}

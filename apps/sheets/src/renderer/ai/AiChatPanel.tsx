@@ -1,3 +1,4 @@
+import {getOfficeHost} from '../office-host'
 import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
@@ -227,11 +228,11 @@ export interface AiChatMessage {
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
-  getSettings: () => window.desktopApi.getAiSettings(),
-  setSettings: (settings) => window.desktopApi.setAiSettings(settings),
-  onSettingsChanged: (handler) => window.desktopApi.onAiSettingsChanged(handler),
-  gskLoggedIn: () => window.desktopApi.aiGskStatus().then((s) => !!s?.loggedIn),
-  openModelSettings: () => window.desktopApi.openAiModelSettings().catch(() => {}),
+  getSettings: () => getOfficeHost().getAiSettings(),
+  setSettings: (settings) => getOfficeHost().setAiSettings(settings),
+  onSettingsChanged: (handler) => getOfficeHost().onAiSettingsChanged(handler),
+  gskLoggedIn: () => getOfficeHost().aiGskStatus().then((s) => !!s?.loggedIn),
+  openModelSettings: () => getOfficeHost().openAiModelSettings().catch(() => {}),
 }
 
 export function AiChatPanel({
@@ -354,7 +355,7 @@ export function AiChatPanel({
     for (const a of wanted) {
       if (!ATTACHMENT_IMAGE_EXTS.has(a.ext) || previewRequestedRef.current.has(a.path)) continue
       previewRequestedRef.current.add(a.path)
-      void window.desktopApi
+      void getOfficeHost()
         .readAttachmentImage(a.path)
         .then((r) => {
           if (!previewRequestedRef.current.has(a.path)) return // removed while the read was in flight
@@ -493,7 +494,7 @@ export function AiChatPanel({
   const citationNav = { scheme: SHEET_NAV_SCHEME, onNavigate: onCitation }
   // [name](filenav:///abs/path) citations open the cited file in its own app
   const fileNav = createFileNav((path) => {
-    void window.desktopApi.openSourcePath(path)
+    void getOfficeHost().openSourcePath(path)
   })
 
   const send = (): void => {
@@ -518,7 +519,7 @@ export function AiChatPanel({
     e.stopPropagation()
     setDragOver(false)
     const paths = Array.from(e.dataTransfer.files)
-      .map((f) => window.desktopApi.getPathForFile(f))
+      .map((f) => getOfficeHost().getPathForFile(f))
       .filter(Boolean)
     if (paths.length > 0) onAddAttachmentPaths(paths)
   }
@@ -528,7 +529,7 @@ export function AiChatPanel({
   const onPasteFiles = (files: File[]): void => {
     const paths: string[] = []
     for (const f of files) {
-      const p = window.desktopApi.getPathForFile(f)
+      const p = getOfficeHost().getPathForFile(f)
       if (p) {
         paths.push(p)
         continue
@@ -571,7 +572,7 @@ export function AiChatPanel({
         <div className="ai-panel-header-actions">
           <AiPanelSideButton
             lang={lang}
-            onMove={(side) => window.desktopApi.setAiPanelPrefs({ side })}
+            onMove={(side) => getOfficeHost().setAiPanelPrefs({ side })}
           />
           {(chat.length > 0 || historicChat.length > 0) && (
             <button
@@ -697,7 +698,7 @@ export function AiChatPanel({
                 {entry.loginRequired && (
                   <button
                     className="ai-login-btn"
-                    onClick={() => void window.desktopApi.aiGskLogin()}
+                    onClick={() => void getOfficeHost().aiGskLogin()}
                   >
                     {t('aiGskLoginBtn')}
                   </button>

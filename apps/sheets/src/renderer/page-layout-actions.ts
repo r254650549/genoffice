@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 /**
  * Page Layout commands, header/footer, freeze journaling and PDF export.
  * Extracted from App.tsx; the App component passes a PageLayoutContext built
@@ -523,10 +524,10 @@ export function createPrintPreviewHost(ctx: PageLayoutContext): PrintPreviewHost
       if (pageCount === 0) throw new PrintError(t('appPrintNothing'))
       return { documents, fileName: `${baseName}.pdf`, pageCount }
     },
-    listPrinters: () => window.desktopApi.listPrinters(),
+    listPrinters: () => getOfficeHost().listPrinters(),
     async print(job, output) {
       const request = printRequest(job.documents, job.fileName, include(output.pages))
-      const result = await window.desktopApi.printWorkbook({
+      const result = await getOfficeHost().printWorkbook({
         ...request,
         ...(output.deviceName === null ? {} : { deviceName: output.deviceName }),
         copies: output.copies,
@@ -536,7 +537,7 @@ export function createPrintPreviewHost(ctx: PageLayoutContext): PrintPreviewHost
       return result.error === undefined ? t('appPrintCanceled') : t('appPrintFailed')
     },
     async exportPdf(job, pages) {
-      const result = await window.desktopApi.exportPdf(
+      const result = await getOfficeHost().exportPdf(
         printRequest(job.documents, job.fileName, include(pages)),
       )
       return result.canceled ? t('appPdfCanceled') : t('appPdfExported', { path: result.path })
@@ -649,7 +650,7 @@ export async function handleExportPdf(ctx: PageLayoutContext, outPath?: string):
       failed: t('appPdfExportFailed'),
     })
     if (!payload) return false
-    const result = await window.desktopApi.exportPdf({
+    const result = await getOfficeHost().exportPdf({
       ...payload,
       ...(outPath ? { outPath } : {}),
     })
@@ -704,7 +705,7 @@ async function loadHeaderFooterPictures(
   await Promise.all(
     slots.map(async (slot) => {
       try {
-        const media = await window.desktopApi.readWorkbookMedia({ sessionId, visualId: slot.id })
+        const media = await getOfficeHost().readWorkbookMedia({ sessionId, visualId: slot.id })
         const dataUrl = isMetafileMime(media.mediaType)
           ? await metafileToDataUrl(base64ToBytes(media.base64), media.mediaType)
           : `data:${media.mediaType};base64,${media.base64}`

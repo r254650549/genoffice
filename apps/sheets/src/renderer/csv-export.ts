@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 /// CSV export of the active sheet: display strings from the live Univer model
 /// (number formats applied, formula results, values only), Excel-style
 /// quoting, CRLF rows. The main process runs the loss warning + save dialog
@@ -144,7 +145,7 @@ export async function handleExportCsv(ctx: CsvExportContext, targetPath?: string
       return
     }
     const baseName = (state?.file.name ?? 'Book1').replace(/\.[^.]+$/, '')
-    const result = await window.desktopApi.exportCsv({
+    const result = await getOfficeHost().exportCsv({
       fileName: `${baseName}.csv`,
       content,
       hasFormulas: sheetHasFormulas(sheet),

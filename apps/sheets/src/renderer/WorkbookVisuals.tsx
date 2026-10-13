@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 import { Fragment, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { BooleanNumber, numfmt } from '@univerjs/core'
@@ -1689,7 +1690,7 @@ function useWorkbookMediaUrl(
   useEffect(() => {
     if (sessionId === undefined) return
     let isCurrent = true
-    void window.desktopApi
+    void getOfficeHost()
       .readWorkbookMedia({ sessionId, visualId })
       .then(async (media) => {
         const next = isMetafileMime(media.mediaType)

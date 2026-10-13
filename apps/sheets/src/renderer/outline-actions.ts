@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 /**
  * Outline (Group) actions behind the gutter buttons and the Data tab:
  * fold/unfold rides Univer's hide/show commands (journaled, undoable); the
@@ -280,7 +281,7 @@ export async function loadRowOutlines(
       if (lazyWorkbookRef.current !== state) return
       let result
       try {
-        result = await window.desktopApi.readWorkbookRowOutline({
+        result = await getOfficeHost().readWorkbookRowOutline({
           sessionId: state.file.sessionId,
           sheetId: sheet.id,
         })

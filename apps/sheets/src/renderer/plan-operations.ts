@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 /**
  * AI change-plan builders for the sheets renderer.
  *
@@ -1354,7 +1355,7 @@ export async function structuralDeleteFormulaError(
     if (fileSheetIds.has(sheetId)) {
       let result
       try {
-        result = await window.desktopApi.readWorkbookFormulas({
+        result = await getOfficeHost().readWorkbookFormulas({
           sessionId: state.file.sessionId,
           sheetId,
         })

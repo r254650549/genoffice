@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { traceWorkbookDependents, traceWorkbookPrecedents } from '../src/renderer/ai/formula-audit'
@@ -169,6 +170,7 @@ describe('traceWorkbookDependents: lazy workbook', () => {
         }),
       },
     })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     const result = await traceWorkbookDependents(lazyCtx(journal), undefined, 'A1')
     expect(result.dependents.map((dep) => dep.address)).toEqual(['C2', 'C3'])
     expect(result.incompleteSheets).toEqual(['Data'])
@@ -187,6 +189,7 @@ describe('traceWorkbookDependents: lazy workbook', () => {
         }),
       },
     })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     const hit = await traceWorkbookDependents(lazyCtx(new Map(), ops), undefined, 'A2')
     expect(hit.dependents.map((dep) => dep.address)).toEqual(['C2'])
     const miss = await traceWorkbookDependents(lazyCtx(new Map(), ops), undefined, 'A1')
@@ -204,6 +207,7 @@ describe('traceWorkbookDependents: lazy workbook', () => {
         }),
       },
     })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     // Screen A1 is the inserted row — A:A semantically covers it
     const result = await traceWorkbookDependents(lazyCtx(new Map(), ops), undefined, 'A1')
     expect(result.dependents.map((dep) => dep.address)).toEqual(['C2'])
@@ -252,6 +256,7 @@ describe('traceWorkbookDependents: lazy workbook', () => {
         ),
       },
     })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     const renamed = await traceWorkbookDependents(ctx, 'sh2', 'A1')
     expect(renamed.dependents.map((dep) => `${dep.sheetName}!${dep.address}`)).toEqual(['Data!C1'])
     // The file "=Old!A1" refers to the renamed sheet, not the new one that took its name

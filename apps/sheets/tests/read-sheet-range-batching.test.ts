@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { readSheetRangeMapped } from '../src/renderer/univer-sync'
@@ -65,6 +66,7 @@ describe('readSheetRangeMapped: over-cap reads are row-batched', () => {
   beforeEach(() => {
     readWorkbookRange.mockClear()
     vi.stubGlobal('window', { desktopApi: { readWorkbookRange } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
   })
 
   afterEach(() => {

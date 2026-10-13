@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -601,6 +602,7 @@ describe('applyRangeInLoadedChunks', () => {
         },
       },
     }
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     return requests
   }
 

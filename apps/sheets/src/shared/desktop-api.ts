@@ -2856,7 +2856,8 @@ export interface RecoveryPromptPayload {
 /** MCP visible-grid bridge message (shell → renderer, correlated by requestId). */
 export interface McpCommandMessage {
   requestId: string
-  command: 'apply_ops' | 'read_sheet' | 'save_sheet'
+  command: 'apply_ops' | 'read_sheet' | 'save_sheet' | 'describe_tools' | 'undo' | 'redo'
+  expectedRevision?:number
   payload: unknown
 }
 
@@ -2976,7 +2977,7 @@ export interface DesktopApi {
   /// command at a time; the renderer executes it and reports the correlated
   /// result. onMcpCommand returns unsubscribe.
   onMcpCommand(callback: (message: McpCommandMessage) => void): () => void
-  reportMcpResult(result: McpCommandResult): void
+  reportMcpResult(result: McpCommandResult): void | Promise<void>
   signalMcpReady(): void
   /// Is a shell-queued workbook path still waiting to be opened? (The shell's
   /// 'open' nudge loop can time out on slow cold starts; the renderer pulls.)

@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
@@ -55,6 +56,7 @@ function stubFormulas(
       }),
     },
   }
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
 }
 
 const delD = { op: 'delete_cols', sheetId: 'sh1', column: 'D', count: 1 } as const
@@ -176,6 +178,7 @@ describe('structuralDeleteFormulaError', () => {
         }),
       },
     }
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     expect(await structuralDeleteFormulaError(state(), workbook, delD)).toBeNull()
   })
 })

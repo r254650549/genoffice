@@ -22,6 +22,7 @@ export class WorkbookRuntime {
   this.client.onProcessExit(()=>{for(const session of this.sessions.values()){session.transfers.dispose();void unlink(session.snapshotPath).catch(()=>{})}this.sessions.clear()})
  }
  private session(id:string){const value=this.sessions.get(id);if(!value)throw new Error('XLSX_SESSION_EXPIRED');return value}
+ hasSession(id:string){return this.sessions.has(id)}
  async open(bytes?:Buffer):Promise<schemas.WorkbookFile>{
   if(this.sessions.size>=32)throw new Error('XLSX_SESSION_LIMIT')
   const content=bytes??(await csvToXlsxBufferForOpen('', 'Sheet1')).buffer

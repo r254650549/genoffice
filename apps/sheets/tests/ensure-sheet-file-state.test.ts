@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ensureSheetFileState } from '../src/renderer/univer-sync'
@@ -44,6 +45,7 @@ describe('ensureSheetFileState', () => {
       .mockResolvedValueOnce(rangeResult(false))
       .mockResolvedValueOnce(rangeResult(true))
     vi.stubGlobal('window', { desktopApi: { readWorkbookRange } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     const state = makeState()
     const pending = ensureSheetFileState(state, 'sheet-2', { current: state })
     await vi.advanceTimersByTimeAsync(200)
@@ -59,6 +61,7 @@ describe('ensureSheetFileState', () => {
   it('skips sheets whose state is already known or that the session added', async () => {
     const readWorkbookRange = vi.fn()
     vi.stubGlobal('window', { desktopApi: { readWorkbookRange } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     const state = makeState()
     state.sheetProtections.set('sheet-2', {
       protected: false,
@@ -75,6 +78,7 @@ describe('ensureSheetFileState', () => {
   it('gives up when the workbook was replaced meanwhile', async () => {
     const readWorkbookRange = vi.fn().mockResolvedValue(rangeResult(false))
     vi.stubGlobal('window', { desktopApi: { readWorkbookRange } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     const state = makeState()
     expect(await ensureSheetFileState(state, 'sheet-2', { current: null })).toBe(false)
     expect(readWorkbookRange).not.toHaveBeenCalled()

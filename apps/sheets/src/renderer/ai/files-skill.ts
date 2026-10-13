@@ -1,3 +1,4 @@
+import {getOfficeHost} from '../office-host'
 import type { AgentSkill } from '@genoffice/agent-core'
 import type { AttachmentMeta } from '../../shared/desktop-api'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/desktop-api'
@@ -77,7 +78,7 @@ export function createFilesSkill(getAttachments: () => readonly AttachmentMeta[]
         }
       }
       const offset = Math.max(0, Number(call.input.offset) || 0)
-      const result = await window.desktopApi.readAttachment(att.path, offset, READ_CHUNK_CHARS)
+      const result = await getOfficeHost().readAttachment(att.path, offset, READ_CHUNK_CHARS)
       if (!result.ok) {
         return {
           output: result.error ?? 'Read failed',

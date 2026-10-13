@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 /**
  * The MCP apply_ops boundary validates raw ops against the workbook DSL schema
  * (the same gate the built-in AI path applies). Without it, an op missing its
@@ -29,6 +30,7 @@ beforeEach(() => {
       signalMcpReady: () => {},
     },
   }
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
 })
 
 function bridgeWith(overrides: Partial<McpSheetHandlers> = {}): McpSheetHandlers {

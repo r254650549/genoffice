@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 import { useEffect, useState } from 'react'
 
 import type { ScreenSourcesResult } from '../shared/desktop-api'
@@ -31,7 +32,7 @@ export function ScreenshotDialog({
     let stale = false
     setState({ phase: 'loading' })
     setFailed(false)
-    window.desktopApi
+    getOfficeHost()
       .captureScreenSources()
       .then((result) => {
         if (stale) return
@@ -52,7 +53,7 @@ export function ScreenshotDialog({
     if (capturingId !== null) return
     setCapturingId(id)
     setFailed(false)
-    window.desktopApi
+    getOfficeHost()
       .captureScreenSource({ id })
       .then((result) => {
         if (!result) {

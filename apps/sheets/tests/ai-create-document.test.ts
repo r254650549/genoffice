@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -251,6 +252,7 @@ beforeEach(() => {
   ;(globalThis as unknown as { window: unknown }).window = {
     desktopApi: { createDocument: createDocumentBridge },
   }
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
 })
 
 describe('createAiDocument (renderer bridge)', () => {

@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleSave, type SaveContext } from '../src/renderer/save-actions'
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import {
   carryLateJournalCells,
   createEditJournal,
@@ -23,6 +24,7 @@ beforeEach(() => {
   ;(globalThis as unknown as { window: unknown }).window = {
     desktopApi: { saveWorkbookEdits, writeWorkbookRecovery },
   }
+  configureOfficeHost({saveWorkbookEdits,writeWorkbookRecovery} as unknown as OfficeHost)
 })
 
 function stateWith(journal: EditJournal, sessionId: string) {

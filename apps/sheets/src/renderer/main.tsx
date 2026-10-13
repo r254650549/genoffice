@@ -1,3 +1,4 @@
+import {configureOfficeHost,getOfficeHost} from './office-host'
 import ReactDOM from 'react-dom/client'
 import { htmlDir, htmlLang, type Lang } from '@genoffice/i18n'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
@@ -29,6 +30,8 @@ if (import.meta.hot) {
     if (replacesUniverRuntime) window.location.reload()
   })
 }
+
+if (!getOfficeHost()) configureOfficeHost(window.desktopApi)
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Missing application root.')
@@ -70,9 +73,9 @@ async function bootstrap(): Promise<void> {
     // per-promise catch: standalone runs have no app:get-theme handler, and
     // that rejection must not drop a resolved language
     ;[lang, theme, docTheme] = await Promise.all([
-      window.desktopApi.getLanguage().catch(() => 'zh' as const),
-      window.desktopApi.getTheme().catch(() => 'system' as const),
-      window.desktopApi.getDocumentTheme?.().catch(() => 'follow' as const),
+      getOfficeHost().getLanguage().catch(() => 'zh' as const),
+      getOfficeHost().getTheme().catch(() => 'system' as const),
+      getOfficeHost().getDocumentTheme?.().catch(() => 'follow' as const),
     ])
   } catch {
     /* dev renderer without the preload bridge */
@@ -85,14 +88,14 @@ async function bootstrap(): Promise<void> {
   await loadCellFonts()
   // A spare view can receive a file while its renderer is still booting.
   // Check the queued path before the first React paint so it never looks Ready.
-  const queuedWorkbookAtBoot = await window.desktopApi?.hasQueuedWorkbook?.().catch(() => false)
-  window.desktopApi?.onThemeChanged(applyTheme)
-  window.desktopApi?.onDocumentThemeChanged?.(applyDocumentTheme)
-  await window.desktopApi
+  const queuedWorkbookAtBoot = await getOfficeHost()?.hasQueuedWorkbook?.().catch(() => false)
+  getOfficeHost()?.onThemeChanged(applyTheme)
+  getOfficeHost()?.onDocumentThemeChanged?.(applyDocumentTheme)
+  await getOfficeHost()
     ?.getAiPanelPrefs?.()
     .then(applyAiPanelPrefs)
     .catch(() => {})
-  window.desktopApi?.onAiPanelPrefsChanged?.(applyAiPanelPrefs)
+  getOfficeHost()?.onAiPanelPrefsChanged?.(applyAiPanelPrefs)
   ReactDOM.createRoot(root!).render(
     <LocaleProvider initial={lang}>
       <App queuedWorkbookAtBoot={queuedWorkbookAtBoot === true} />

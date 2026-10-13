@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { activateFormulaClosure, truncatedIndexRetiresEngine } from '../src/renderer/univer-sync'
@@ -54,6 +55,7 @@ function stubDesktopApi(small: FormulaCell[], truncated: FormulaCell[]): void {
           : { truncated: true, indexingComplete: false, cells: truncated, sharedGroups: [] },
     },
   }
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
 }
 
 const runtime = {

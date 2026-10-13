@@ -1,3 +1,4 @@
+import {getOfficeHost} from './office-host'
 /**
  * Color tool trigger + the shared Word-style palette (@genoffice/ui ColorPicker),
  * anchored below its trigger via the `.menu-select` / `.sheets-color-pop` CSS
@@ -92,7 +93,7 @@ export function ColorDropdown({
     // capture phase: the grid canvas stops mousedown propagation, so bubble-phase listeners never fire
     window.addEventListener('pointerdown', onDown, true)
     window.addEventListener('keydown', onKey)
-    const offChrome = window.desktopApi?.onChromePressed?.(() => setOpen(false))
+    const offChrome = getOfficeHost()?.onChromePressed?.(() => setOpen(false))
     return () => {
       window.removeEventListener('pointerdown', onDown, true)
       window.removeEventListener('keydown', onKey)

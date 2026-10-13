@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkbookFindCellsResult } from '../src/shared/desktop-api'
@@ -48,6 +49,7 @@ function page(
 
 function install(findWorkbookCells: ReturnType<typeof vi.fn>) {
   vi.stubGlobal('window', { desktopApi: { findWorkbookCells } })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
   return findWorkbookCells
 }
 
@@ -59,6 +61,7 @@ describe('sidecarFindAvailable', () => {
   it('is false without the preload API', () => {
     expect(sidecarFindAvailable()).toBe(false)
     vi.stubGlobal('window', { desktopApi: {} })
+  configureOfficeHost((typeof window === "undefined" ? undefined : window?.desktopApi) as unknown as OfficeHost)
     expect(sidecarFindAvailable()).toBe(false)
     install(vi.fn())
     expect(sidecarFindAvailable()).toBe(true)

@@ -9,6 +9,8 @@ import { applyCellEditsToXlsx } from '@genoffice/xlsx-gateway/gateway/xlsx-gatew
 import { handleSave, type SaveContext } from '../src/renderer/save-actions'
 import { createEditJournal, recordSetRangeValues } from '../src/renderer/edit-journal'
 import { buildEditFixture } from './fixture-builder'
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
+import { workbookSaveRequestSchema } from '../src/shared/desktop-api'
 
 const saveWorkbookEdits = vi.fn()
 const writeWorkbookRecovery = vi.fn()
@@ -19,9 +21,10 @@ beforeEach(() => {
   ;(globalThis as unknown as { window: unknown }).window = {
     desktopApi: { saveWorkbookEdits, writeWorkbookRecovery },
   }
+  configureOfficeHost({ saveWorkbookEdits, writeWorkbookRecovery } as unknown as OfficeHost)
 })
 
-function ctxWith(opts: { dirty: boolean; needsSaveAs?: boolean; restoredFromRecovery?: boolean }): {
+function ctxWith(opts: { dirty: boolean; needsSaveAs?: boolean; restoredFromRecovery?: boolean; unsavedNew?: boolean }): {
   ctx: SaveContext
   messages: string[]
   journal: ReturnType<typeof createEditJournal>
@@ -52,6 +55,7 @@ function ctxWith(opts: { dirty: boolean; needsSaveAs?: boolean; restoredFromReco
             sessionId: '11111111-1111-4111-8111-111111111111',
             needsSaveAs: !!opts.needsSaveAs,
             restoredFromRecovery: !!opts.restoredFromRecovery,
+            unsavedNew: !!opts.unsavedNew,
           },
         },
       } as never,
@@ -62,6 +66,27 @@ function ctxWith(opts: { dirty: boolean; needsSaveAs?: boolean; restoredFromReco
 }
 
 describe('handleSave recovery mode', () => {
+  it('passes the native validator when first saving an untouched new workbook', async () => {
+    const { ctx } = ctxWith({ dirty: false, unsavedNew: true })
+    saveWorkbookEdits.mockImplementationOnce(async payload => {
+      workbookSaveRequestSchema.parse(payload)
+      return { canceled: true }
+    })
+    await handleSave(ctx, 'save')
+    expect(saveWorkbookEdits).toHaveBeenCalledTimes(1)
+    expect(saveWorkbookEdits.mock.calls[0]![0].mode).toBe('save-as')
+  })
+
+  it('passes the native validator for a Web draft undo back to no journal edits', async () => {
+    configureOfficeHost({ kind: 'web', saveWorkbookEdits, writeWorkbookRecovery } as unknown as OfficeHost)
+    writeWorkbookRecovery.mockImplementationOnce(async payload => {
+      workbookSaveRequestSchema.parse(payload)
+      return { ok: true }
+    })
+    const { ctx } = ctxWith({ dirty: false })
+    await expect(handleSave(ctx, 'recovery')).resolves.toEqual({ ok: true })
+    expect(writeWorkbookRecovery).toHaveBeenCalledTimes(1)
+  })
   it('writes a recovery copy and never the opened file', async () => {
     const { ctx, messages } = ctxWith({ dirty: true })
     await handleSave(ctx, 'recovery')
