@@ -54,6 +54,24 @@ async function applyOps(payload: Record<string, unknown>): Promise<void> {
 }
 
 describe('mcp bridge apply_ops validation', () => {
+  it('reports a refused operation as an error, rather than a completed mutation', async () => {
+    const uninstall=installSheetsMcpBridge(bridgeWith({applyOps:vi.fn().mockResolvedValue({ok:false,reason:'protected cells'})}))
+    commandListener!({requestId:11,command:'apply_ops',payload:{ops:[{op:'set_cell',sheetId:'sheet-1',address:'A1',value:'x'}]}})
+    await vi.waitFor(()=>expect(reportMcpResult).toHaveBeenCalledTimes(1))
+    expect(reportMcpResult.mock.calls[0]![0]).toMatchObject({ok:false,error:'protected cells'})
+    uninstall()
+  })
+  it('waits for unloaded cells before returning the read result',async()=>{
+    let complete!:(value:unknown)=>void
+    const cells=new Promise(resolve=>{complete=resolve})
+    const uninstall=installSheetsMcpBridge(bridgeWith({readCells:()=>cells}))
+    commandListener!({requestId:12,command:'read_sheet',payload:{addresses:['B2000']}})
+    await Promise.resolve();expect(reportMcpResult).not.toHaveBeenCalled()
+    complete({B2000:{value:99}})
+    await vi.waitFor(()=>expect(reportMcpResult).toHaveBeenCalledTimes(1))
+    expect(reportMcpResult.mock.calls[0]![0]).toMatchObject({ok:true,result:{cells:{B2000:{value:99}}}})
+    uninstall()
+  })
   it('rejects an op missing sheetId with the op named and a read_sheet hint', async () => {
     await applyOps({ ops: [{ op: 'set_cell', address: 'A1', value: 'x' }] })
     const reply = reportMcpResult.mock.calls[0]![0] as { ok: boolean; error?: string }

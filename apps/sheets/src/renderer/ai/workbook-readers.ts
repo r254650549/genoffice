@@ -11,7 +11,9 @@ import type { InMemoryWorkbookAdapter } from '@genoffice/xlsx-gateway/domain/in-
 import type { CellFormatState, CellScalar } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { planFileTableRegistrations } from '../file-tables'
 import { toSelectionFormat } from '../selection-format'
-import { lazyCellReader } from '../univer-sync'
+import { lazyCellReader,ensureLazyRangeLoaded } from '../univer-sync'
+import { ensureAddressableGrid } from '../grid-growth'
+import { journalCellContentAt } from '../edit-journal'
 import { lazySheetScreenExtent, type LazyWorkbookState, type UniverRuntime } from '../univer-state'
 import type { ActiveSheetInfo, FrozenSelection } from './tools'
 
@@ -411,6 +413,25 @@ export function getActiveSheetInfo(
       })),
     ),
   }
+}
+
+export async function readLiveDraftCells(ctx:WorkbookReadContext,addresses:readonly string[],sheetId:string|undefined,setMessage:(message:string)=>void):Promise<ReturnType<typeof readCells>>{
+  const runtime=ctx.univerRef.current,workbook=runtime?.univerAPI.getActiveWorkbook(),worksheet=sheetId?workbook?.getSheetBySheetId(sheetId):workbook?.getActiveSheet(),initial=ctx.lazyWorkbookRef.current
+  if(!runtime||!worksheet||!initial)throw new Error('Worksheet is not ready')
+  const result:ReturnType<typeof readCells>={}
+  for(const address of [...new Set(addresses)]){
+    const {row,column}=parseAddress(address),range={startRow:row,endRow:row,startColumn:column,endColumn:column},id=worksheet.getSheetId()
+    ensureAddressableGrid(runtime,worksheet,range)
+    const journal=journalCellContentAt(initial.editJournal,id,row,column)
+    if(journal.found&&journal.formula===null){result[address]={value:journal.value,rawValue:journal.value};continue}
+    const extent=lazySheetScreenExtent(initial,id)
+    // A new sheet/cell outside the base file exists only in the draft. There
+    // are no original bytes to hydrate; do not mistake that for a failed read.
+    if(extent&&row<extent.rows&&column<extent.columns&&!await ensureLazyRangeLoaded(runtime,ctx.lazyWorkbookRef,worksheet,range,setMessage))throw new Error('Requested cells could not be loaded')
+    if(ctx.lazyWorkbookRef.current!==initial)throw new Error('Workbook changed while reading cells')
+    Object.assign(result,readCells(ctx,[address],sheetId))
+  }
+  return result
 }
 
 export function readCells(

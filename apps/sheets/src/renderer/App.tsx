@@ -33,7 +33,7 @@ import {
   installWrapMeasureLifecycle,
   noteSidecarCrash,
 } from './univer-sync'
-import { installGridGrowth } from './grid-growth'
+import { installGridGrowth, ensureOperationGrids } from './grid-growth'
 import {
   pollUntilReady,
   runHeadlessRendererExport,
@@ -264,6 +264,7 @@ import {
 import {
   getActiveSheetInfo as getActiveSheetInfoImpl,
   readCells as readCellsImpl,
+  readLiveDraftCells,
   readFormats as readFormatsImpl,
   readSheetFeatures as readSheetFeaturesImpl,
   type WorkbookReadContext,
@@ -4691,8 +4692,8 @@ export function App({
     // rendered text a number format or a narrow column produced. The rendered
     // text rides along as `display` when the two differ, so a caller can still
     // see what the user sees (see modelCellValue).
-    readCells: (addresses, sheetId) => {
-      const cells = readCellsImpl(readContext(), addresses, sheetId)
+    readCells: async (addresses, sheetId) => {
+      const cells=await readLiveDraftCells(readContext(),addresses,sheetId,setMessage)
       return Object.fromEntries(
         Object.entries(cells).map(([address, cell]) => {
           const value = modelCellValue(cell)
@@ -4745,6 +4746,7 @@ export function App({
       if (!runtime || !state || !workbook) {
         return { ok: false, reason: t('appNoWorkbookOpen') }
       }
+      ensureOperationGrids(runtime,ops)
       if (dryRun) {
         try {
           const plan = planFromOps(ops, workbook, 'mcp')
@@ -5116,7 +5118,7 @@ export function App({
         zoomPercent={zoomPercent}
         statusBarFuncs={statusBarFuncs}
         onToggleStatusBarFunc={toggleStatusBarStat}
-        canSave={pendingEdits > 0 || workbookFile?.unsavedNew === true}
+        canSave={pendingEdits > 0 || workbookFile?.unsavedNew === true || workbookFile?.restoredFromRecovery === true}
         onSave={() => void handleSave('save')}
         canSaveAs={workbookFile !== null}
         onSaveAs={() => void handleSave('save-as')}

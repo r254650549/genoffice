@@ -152,7 +152,8 @@ export function installSheetsMcpBridge(handlers: McpSheetHandlers): () => void {
             return
           }
           if (addresses.length > 0) {
-            await reply(true, { cells: handlers.readCells(addresses, resolved.sheetId) })
+            if(addresses.length>256)throw new Error('read_sheet accepts at most 256 addresses per request')
+            await reply(true, { cells: await handlers.readCells(addresses, resolved.sheetId) })
           } else {
             await reply(true, { context: handlers.context() })
           }
@@ -184,7 +185,9 @@ export function installSheetsMcpBridge(handlers: McpSheetHandlers): () => void {
           const dryRun = payload.dryRun === true
           if (sheetId !== undefined && !dryRun)
             handlers.focusSheet(sheetId, primaryCellOf(parsed.data))
-          await reply(true, await handlers.applyOps(parsed.data, dryRun))
+          const result=await handlers.applyOps(parsed.data,dryRun)
+          const failed=result!==null&&typeof result==='object'&&(result as {ok?:boolean}).ok===false
+          await reply(!failed,result,failed?String((result as {reason?:string}).reason??'The workbook operation was not applied'):undefined)
           return
         }
         case 'save_sheet': {

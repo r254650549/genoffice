@@ -121,3 +121,23 @@ Sheets Web host checkpoint and clean-close fixes (2026-10-13):
   Windows-sidecar suites and platform-specific atomic-file fault tests excluded;
   the real Linux native-engine verification is recorded separately. The exact
   test counts and exclusions are recorded in the parent checkpoint.
+
+Sheets live-draft tools and recovery acceptance (2026-10-13):
+
+- Native MCP calls await existing-file range loads. New/unsaved cells and sheets
+  are read from the original edit journal before consulting immutable file data.
+  Refused apply operations produce failed receipts. Addressed operations extend
+  only display bounds, outside undo history; matrices and copy footprints are
+  covered, and hyperlink URLs are not parsed as ranges.
+- Recovered drafts enable the existing native Save action even when their
+  journal is empty because the recovered bytes themselves are unsaved changes.
+- Parent real-model/browser acceptance covers formulas, bold style, two sheets,
+  remote cells B2000/C3000/D4000, native undo/redo, exact Rust-child interruption,
+  fresh-page draft recovery and four versions of the same cloud file. The parent
+  retains failure/replay receipts and independent OOXML/download hash evidence.
+- Parent execution-host fixes reuse verified runtime files after Agent restart
+  and recover durable Office receipts without a sandbox tool row. Native engine,
+  writer, formulas, journal and undo implementations remain this fork's originals.
+- Sheets typecheck and targeted native tests pass; browser-independent full
+  suite exclusions and actual-Office/complex-format limitations remain recorded
+  in the parent. This is core tool-path acceptance, not full XLSX compatibility.

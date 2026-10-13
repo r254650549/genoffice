@@ -1,7 +1,9 @@
 import { IRenderManagerService } from '@univerjs/engine-render'
 import { SheetSkeletonManagerService } from '@univerjs/sheets-ui'
 
-import type { UniverRuntime } from './univer-state'
+import type { UniverRuntime, UniverWorksheet } from './univer-state'
+import {parseRange,parseAddress} from '@genoffice/xlsx-gateway/domain/cell-address'
+import type {WorkbookOperation} from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 
 /// Grows a worksheet's grid as the viewport approaches its edge.
 ///
@@ -38,6 +40,39 @@ const ROW_LOOKAHEAD = 200
 /// same distance.
 const COLUMN_STEP = 26
 const ROW_STEP = 200
+
+/** Addressed operations need the same virtual grid as scrolling. This changes
+ * display bounds only; it neither inserts file rows nor adds undo entries. */
+export function ensureAddressableGrid(runtime: UniverRuntime, worksheet: UniverWorksheet, range: {startRow:number;endRow:number;startColumn:number;endColumn:number}): void {
+  if (![range.startRow,range.endRow,range.startColumn,range.endColumn].every(Number.isSafeInteger) || range.startRow<0 || range.startColumn<0 || range.endRow<range.startRow || range.endColumn<range.startColumn || range.endRow>LAST_ROW_INDEX || range.endColumn>LAST_COLUMN_INDEX) throw new Error('Cell range is outside the XLSX grid')
+  const unitId=worksheet.getSheet().getUnitId(),subUnitId=worksheet.getSheetId()
+  if(range.endColumn>=worksheet.getMaxColumns())runtime.univerAPI.syncExecuteCommand('sheet.mutation.set-worksheet-column-count',{unitId,subUnitId,columnCount:Math.min(LAST_COLUMN_INDEX+1,range.endColumn+1+COLUMN_LOOKAHEAD)})
+  if(range.endRow>=worksheet.getMaxRows())runtime.univerAPI.syncExecuteCommand('sheet.mutation.set-worksheet-row-count',{unitId,subUnitId,rowCount:Math.min(LAST_ROW_INDEX+1,range.endRow+1+ROW_LOOKAHEAD)})
+}
+
+export function ensureOperationGrids(runtime:UniverRuntime,ops:readonly WorkbookOperation[]):void {
+  const workbook=runtime.univerAPI.getActiveWorkbook()
+  if(!workbook)return
+  for(const op of ops){
+    const value=op as unknown as Record<string,unknown>,sheetId=value.sheetId as string|undefined
+    const grow=(address:unknown,id=sheetId)=>{if(typeof address!=='string'||!id)return;const sheet=workbook.getSheetBySheetId(id);if(sheet)ensureAddressableGrid(runtime,sheet,parseRange(address))}
+    for(const key of ['address','range','start','anchorCell','dataRange'])grow(value[key])
+    grow(value.sourceRange,(value.sourceSheetId as string|undefined)??sheetId)
+    grow(value.targetCell,(value.targetSheetId as string|undefined)??sheetId)
+    // A hyperlink's target is a URL, not a cell range.
+    if(op.op==='copy_range'||op.op==='fill_range'){
+      grow(op.source,op.sourceSheetId??op.sheetId);grow(op.target,op.sheetId)
+      if(op.op==='copy_range'){
+        const source=parseRange(op.source),target=parseRange(op.target),sheet=workbook.getSheetBySheetId(op.sheetId)
+        if(sheet)ensureAddressableGrid(runtime,sheet,{...target,endRow:Math.max(target.endRow,target.startRow+source.endRow-source.startRow),endColumn:Math.max(target.endColumn,target.startColumn+source.endColumn-source.startColumn)})
+      }
+    }
+    if(op.op==='set_range'&&op.start){
+      const start=parseAddress(op.start),sheet=workbook.getSheetBySheetId(op.sheetId)
+      if(sheet&&op.values.length)ensureAddressableGrid(runtime,sheet,{startRow:start.row,startColumn:start.column,endRow:start.row+op.values.length-1,endColumn:start.column+Math.max(...op.values.map(row=>row.length))-1})
+    }
+  }
+}
 
 export interface GridEdge {
   /// first visible column and row, 0-based (Univer's own indices)

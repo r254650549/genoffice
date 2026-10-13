@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { CommandType, ICommandService, IUndoRedoService, LogLevel, Univer } from '@univerjs/core'
+import { CommandType, ICommandService, IUndoRedoService, LogLevel, LocaleType, Univer } from '@univerjs/core'
 import { UniverSheetsPlugin } from '@univerjs/sheets'
 import '@univerjs/sheets/facade'
 import { FUniver } from '@univerjs/core/lib/facade'
 import { describe, expect, it } from 'vitest'
 
-import { installGridGrowth, nextGridGrowth } from '../src/renderer/grid-growth'
+import { installGridGrowth, nextGridGrowth, ensureAddressableGrid,ensureOperationGrids } from '../src/renderer/grid-growth'
 import type { UniverRuntime } from '../src/renderer/univer-state'
 
 /// A blank workbook's grid, and a viewport parked at A1.
@@ -129,7 +129,7 @@ const SHEET_ID = 'grid-growth-undo-sheet'
 const BLANK_SHEET_SIZE = { rowCount: 1000, columnCount: 26 }
 
 function bootBlankWorkbook() {
-  const univer = new Univer({ logLevel: LogLevel.SILENT })
+  const univer = new Univer({ logLevel: LogLevel.SILENT,locale:LocaleType.EN_US,locales:{[LocaleType.EN_US]:{}} })
   univer.registerPlugin(UniverSheetsPlugin)
   const univerAPI = FUniver.newAPI(univer)
   univerAPI.createWorkbook({
@@ -165,6 +165,37 @@ function undoStackLength(undoRedoService: IUndoRedoService): number {
 }
 
 describe('grid growth and the undo stack', () => {
+  it('grows to the full matrix bounds and treats hyperlink targets as URLs',()=>{
+    const {univer,univerAPI,worksheet,undoRedoService}=bootBlankWorkbook()
+    try{
+      const runtime={univer,univerAPI} as unknown as UniverRuntime
+      ensureOperationGrids(runtime,[{op:'set_hyperlink',sheetId:SHEET_ID,address:'A1',target:'https://example.com/page'}])
+      expect(worksheet.getMaxRows()).toBe(1000)
+      ensureOperationGrids(runtime,[{op:'set_range',sheetId:SHEET_ID,start:'AZ2000',values:[[1,2],[3,4]]}])
+      expect(worksheet.getMaxRows()).toBeGreaterThanOrEqual(2001)
+      expect(worksheet.getMaxColumns()).toBeGreaterThanOrEqual(53)
+      expect(undoStackLength(undoRedoService)).toBe(0)
+    }finally{univer.dispose()}
+  })
+  it('makes remote addresses writable without inserting file rows or an undo step',()=>{
+    const {univer,univerAPI,worksheet,undoRedoService}=bootBlankWorkbook()
+    try{
+      ensureAddressableGrid({univer,univerAPI} as unknown as UniverRuntime,worksheet as never,{startRow:1999,endRow:1999,startColumn:100,endColumn:100})
+      expect(worksheet.getMaxRows()).toBeGreaterThanOrEqual(2000)
+      expect(worksheet.getMaxColumns()).toBeGreaterThanOrEqual(101)
+      expect(undoStackLength(undoRedoService)).toBe(0)
+      worksheet.getRange('B2000').setValue(99)
+      expect(worksheet.getRange('B2000').getValue()).toBe(99)
+    }finally{univer.dispose()}
+  })
+  it('rejects out-of-format addresses before any grid mutation',()=>{
+    const {univer,univerAPI,worksheet}=bootBlankWorkbook()
+    try{
+      expect(()=>ensureAddressableGrid({univer,univerAPI} as unknown as UniverRuntime,worksheet as never,{startRow:0,endRow:1048576,startColumn:0,endColumn:0})).toThrow('outside the XLSX grid')
+      expect(worksheet.getMaxRows()).toBe(1000)
+      expect(worksheet.getMaxColumns()).toBe(26)
+    }finally{univer.dispose()}
+  })
   it('grows the grid on a scroll without touching the undo stack', () => {
     const { univer, univerAPI, commandService, undoRedoService, worksheet } = bootBlankWorkbook()
     const dispose = installGridGrowth({ univer, univerAPI } as unknown as UniverRuntime)
