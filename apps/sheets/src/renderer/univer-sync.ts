@@ -3127,7 +3127,10 @@ async function loadRange(
     return
   }
   const requestKey = `${range.startRow}:${range.endRow}:${range.startColumn}:${range.endColumn}`
-  if (!isRetry && state.loadingKeys.get(sheetId) === requestKey) return
+  // Viewport reads may deduplicate fire-and-forget work. An awaited tool
+  // read must still load/index its cells when it races that viewport read;
+  // returning here incorrectly reports an unloaded but valid range as failed.
+  if (!isRetry && !waitForRequestedRange && state.loadingKeys.get(sheetId) === requestKey) return
   const previousTimer = state.retryTimers.get(sheetId)
   if (previousTimer) clearTimeout(previousTimer)
   state.retryTimers.delete(sheetId)

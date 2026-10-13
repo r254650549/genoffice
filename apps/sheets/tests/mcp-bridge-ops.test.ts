@@ -54,6 +54,15 @@ async function applyOps(payload: Record<string, unknown>): Promise<void> {
 }
 
 describe('mcp bridge apply_ops validation', () => {
+  it('reads native features and formats for the explicitly named sheet',async()=>{
+    const features=vi.fn().mockReturnValue('Shapes/images: id=added-shape-example'),formats=vi.fn().mockReturnValue({A1:{bold:true}})
+    const uninstall=installSheetsMcpBridge(bridgeWith({readFeatures:features,readFormats:formats,readCells:()=>({A1:{value:10}})}))
+    commandListener!({requestId:13,command:'read_sheet',payload:{sheet:'Sheet1',addresses:['A1'],features:true,formats:true}})
+    await vi.waitFor(()=>expect(reportMcpResult).toHaveBeenCalledTimes(1))
+    expect(features).toHaveBeenCalledWith('sheet-1');expect(formats).toHaveBeenCalledWith(['A1'],'sheet-1')
+    expect(reportMcpResult.mock.calls[0]![0]).toMatchObject({ok:true,result:{cells:{A1:{value:10}},formats:{A1:{bold:true}},features:'Shapes/images: id=added-shape-example'}})
+    uninstall()
+  })
   it('reports a refused operation as an error, rather than a completed mutation', async () => {
     const uninstall=installSheetsMcpBridge(bridgeWith({applyOps:vi.fn().mockResolvedValue({ok:false,reason:'protected cells'})}))
     commandListener!({requestId:11,command:'apply_ops',payload:{ops:[{op:'set_cell',sheetId:'sheet-1',address:'A1',value:'x'}]}})

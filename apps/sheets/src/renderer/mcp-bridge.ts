@@ -36,6 +36,8 @@ export interface McpSheetHandlers {
   context: () => unknown
   /** values + formulas for the requested A1 addresses */
   readCells: (addresses: string[], sheetId?: string) => unknown
+  readFeatures?: (sheetId?: string) => unknown
+  readFormats?: (addresses: string[], sheetId?: string) => unknown
   /** the workbook's worksheets, for resolving name-addressed ops */
   sheets: () => readonly SheetRef[]
   /** apply a workbook DSL batch (planFromOps + applyChangePlan) */
@@ -134,7 +136,7 @@ export function installSheetsMcpBridge(handlers: McpSheetHandlers): () => void {
       const payload = (message.payload ?? {}) as Record<string, unknown>
       switch (message.command) {
         case 'describe_tools':
-          await reply(true,{commands:['read_sheet','apply_ops','save_sheet','undo','redo'],read_sheet:{addresses:'A1 references, e.g. ["A1", "B2"]',sheet:'optional worksheet name'},apply_ops:{ops:z.toJSONSchema(workbookOperationSchema,{io:'input'}),dryRun:'optional boolean'},save_sheet:{},undo:{},redo:{}})
+          await reply(true,{commands:['read_sheet','apply_ops','save_sheet','undo','redo'],read_sheet:{addresses:'A1 references, e.g. ["A1", "B2"]',sheet:'optional worksheet name',features:'true for native feature state, tables, visual IDs, validation, protection and page setup',formats:'true with addresses for native cell formats'},apply_ops:{ops:z.toJSONSchema(workbookOperationSchema,{io:'input'}),dryRun:'optional boolean',...(api.kind==='web'?{imageSource:'add_image.path: immutable permission-checked drive://<file-id>/<version>/<sha256> or a public HTTPS image URL. Upload local/workspace images to Drive first.'}:{})},save_sheet:{},undo:{},redo:{}})
           return
         case 'undo':case 'redo':
           if(!api.history)throw new Error('History host unavailable')
@@ -153,9 +155,11 @@ export function installSheetsMcpBridge(handlers: McpSheetHandlers): () => void {
           }
           if (addresses.length > 0) {
             if(addresses.length>256)throw new Error('read_sheet accepts at most 256 addresses per request')
-            await reply(true, { cells: await handlers.readCells(addresses, resolved.sheetId) })
+            await reply(true, { cells: await handlers.readCells(addresses, resolved.sheetId),
+              ...(payload.formats===true?{formats:await handlers.readFormats?.(addresses,resolved.sheetId)}:{}),
+              ...(payload.features===true?{features:await handlers.readFeatures?.(resolved.sheetId)}:{}) })
           } else {
-            await reply(true, { context: handlers.context() })
+            await reply(true, { context: handlers.context(),...(payload.features===true?{features:await handlers.readFeatures?.(resolved.sheetId)}:{}) })
           }
           return
         }

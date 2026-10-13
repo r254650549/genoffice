@@ -44,12 +44,45 @@ export class WorkbookRuntime {
   const session=this.session(request.sessionId)
   if(request.editsTransferId){request={...request,edits:session.transfers.take(request.editsTransferId,request.sessionId)};delete request.editsTransferId}
   const target=join(this.directory,randomUUID()+'.xlsx')
+  let intermediate:schemas.WorkbookFile|undefined
   try{
-   const mutation=await writeWorkbookTo(this.client,session,request,target)
+   const shifts=request.structuralOps.length>0
+   const sheetShifts=request.sheetOps.some(op=>op.kind!=='set-sheet-tab-color')
+   const heldTables=shifts?request.tableAdditions:[]
+   const heldPivots=shifts||sheetShifts?request.pivotAdditions:[]
+   const heldEdits=shifts?(request.tableEdits??[]).filter(edit=>edit.area!==undefined):[]
+   const heldNames=shifts||sheetShifts?request.definedNamesState:null
+   const staged=heldTables.length>0||heldPivots.length>0||heldEdits.length>0||heldNames!==null
+   let mutation=await writeWorkbookTo(this.client,session,staged?{...request,
+    tableAdditions:heldTables.length?[]:request.tableAdditions,
+    pivotAdditions:heldPivots.length?[]:request.pivotAdditions,
+    tableEdits:(request.tableEdits??[]).filter(edit=>!heldEdits.includes(edit)),
+    definedNamesState:null,
+   }:request,target)
+   if(staged){
+    // Use the same original two-pass writer as the desktop save path, but
+    // keep its intermediate snapshot private. A failed second pass cannot
+    // publish a partial cloud version or replace the browser's base file.
+    intermediate=await this.open(await readFile(target))
+    const names=new Map(session.sheetNames)
+    for(const op of request.sheetOps){
+     if(op.kind==='add-sheet'||op.kind==='duplicate-sheet')names.set(op.sheetId,op.name)
+     else if(op.kind==='rename-sheet')names.set(op.sheetId,op.newName)
+    }
+    const mapped=(id:string)=>{const found=intermediate!.sheets.find(sheet=>sheet.name===names.get(id));if(!found)throw new Error('XLSX_SHEET_NOT_FOUND');return found.id}
+    const cleared=['edits','bulkConstantFills','structuralOps','chartEdits','visualEdits','visualAdditions','sheetOps','sheetOrder','filterStates','hyperlinkEdits','cfStates','dvStates','pageSetupStates','noteStates','formulaValues','pivotCacheRefreshPaths','pivotRefreshUpdates','sheetProtections','sparklineAdditions','protectedRangeStates']
+    const second=schemas.workbookSaveRequestSchema.parse({...request,...Object.fromEntries(cleared.map(key=>[key,[]])),
+     sessionId:intermediate.sessionId,mode:'save-as',editsTransferId:undefined,themeState:null,workbookProtectionState:null,
+     tableAdditions:heldTables.map(table=>({...table,sheetId:mapped(table.sheetId)})),
+     pivotAdditions:heldPivots.map(pivot=>({...pivot,sheetId:mapped(pivot.sheetId),sourceSheetId:mapped(pivot.sourceSheetId)})),
+     tableEdits:heldEdits.map(edit=>({...edit,sheetId:mapped(edit.sheetId)})),definedNamesState:heldNames})
+    const final=await writeWorkbookTo(this.client,this.session(intermediate.sessionId),second,target)
+    mutation={...final,touchedEntries:[...new Set([...mutation.touchedEntries,...final.touchedEntries])]}
+   }
    const bytes=await readFile(target)
    const file=await this.open(bytes)
    return {canceled:false as const,file,touchedEntries:mutation.touchedEntries}
-  }finally{await unlink(target).catch(()=>{})}
+  }finally{if(intermediate)await this.close(intermediate.sessionId).catch(()=>{});await unlink(target).catch(()=>{})}
  }
  async call(method:string,raw:unknown):Promise<unknown>{
   // Every request is validated with the original schemas and bound to an owned session.

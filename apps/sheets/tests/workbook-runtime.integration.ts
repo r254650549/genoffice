@@ -18,6 +18,24 @@ try{
  assert.equal(blankReopened.sheets[0]!.name,'Sheet1')
  await runtime.close(blankReopened.sessionId)
  await runtime.close(blankSaved.file.sessionId)
+ const staged=await runtime.prepareSave(request(first.sessionId,{
+  structuralOps:[{kind:'insert-rows',sheetId,index:9,count:1}],
+  definedNamesState:{names:[{name:'验收金额',formula:'Sheet1!$B$2:$B$4'}],preserveNames:[]},
+ }))
+ const stagedArchive=await JSZip.loadAsync(await runtime.content(staged.file.sessionId))
+ assert((await stagedArchive.file('xl/workbook.xml')!.async('string')).includes('验收金额'))
+ assert.deepEqual(await runtime.content(first.sessionId),original)
+ await runtime.close(staged.file.sessionId)
+ const stagedTable=await runtime.prepareSave(request(first.sessionId,{
+  sheetOps:[{kind:'add-sheet',sheetId:'added-table-sheet',name:'新表结构'}],sheetOrder:[sheetId,'added-table-sheet'],
+  structuralOps:[{kind:'insert-rows',sheetId:'added-table-sheet',index:9,count:1}],
+  edits:[{sheetId:'added-table-sheet',row:0,column:0,writeValue:true,value:'类别'},{sheetId:'added-table-sheet',row:1,column:0,writeValue:true,value:'甲'}],
+  tableAdditions:[{sheetId:'added-table-sheet',name:'StagedTable',area:{startRow:0,endRow:1,startColumn:0,endColumn:0},columnNames:['类别'],style:'TableStyleMedium2',bandedRows:true}],
+ }))
+ const stagedTableZip=await JSZip.loadAsync(await runtime.content(stagedTable.file.sessionId))
+ assert(Object.keys(stagedTableZip.files).some(path=>/^xl\/tables\/table\d+\.xml$/.test(path)))
+ assert.deepEqual(await runtime.content(first.sessionId),original)
+ await runtime.close(stagedTable.file.sessionId)
  const saved=await runtime.prepareSave(request(first.sessionId,{
   edits:[{sheetId,row:0,column:0,writeValue:true,value:10,style:{bold:true}},{sheetId,row:1,column:0,writeValue:true,value:20},{sheetId,row:2,column:0,writeValue:true,value:30,formula:'SUM(A1:A2)'},{sheetId:'new-sheet',row:0,column:0,writeValue:true,value:'第二张工作表'}],
   sheetOps:[{kind:'add-sheet',sheetId:'new-sheet',name:'验收明细'}],sheetOrder:[sheetId,'new-sheet'],

@@ -559,6 +559,21 @@ describe('applyRangeInLoadedChunks', () => {
     delete (globalThis as { window?: unknown }).window
     vi.useRealTimers()
   })
+  it('awaits a tool read that races the same fire-and-forget viewport request',async()=>{
+    const state=streamedState({})
+    state.loadingKeys.set('sheet-1','0:4:0:4')
+    const messages:string[]=[]
+    const raceRuntime={univerAPI:{getActiveWorkbook:()=>({getActiveSheet:()=>worksheet})}}
+    let rejectRead!:(error:Error)=>void,settled=false
+    const read=vi.fn(()=>new Promise((_resolve,reject)=>{rejectRead=reject}))
+    configureOfficeHost({readWorkbookRange:read} as unknown as OfficeHost)
+    const pending=ensureLazyRangeLoaded(raceRuntime as never,{current:state},worksheet as never,LOADED_TOP,message=>{messages.push(message)}).then(value=>{settled=true;return value})
+    await Promise.resolve();expect(read).toHaveBeenCalledTimes(1);expect(settled).toBe(false)
+    rejectRead(new Error('actual range read failed'))
+    await expect(pending).resolves.toBe(false)
+    expect(messages).toEqual(['actual range read failed'])
+    for(const timer of state.retryTimers.values())clearTimeout(timer)
+  })
 
   /// Runs a chunked apply that ends up polling the stalled indexer, fast-
   /// forwarding through the 250ms waits until it gives up.

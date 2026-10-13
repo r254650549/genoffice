@@ -141,3 +141,16 @@ Sheets live-draft tools and recovery acceptance (2026-10-13):
 - Sheets typecheck and targeted native tests pass; browser-independent full
   suite exclusions and actual-Office/complex-format limitations remain recorded
   in the parent. This is core tool-path acceptance, not full XLSX compatibility.
+
+Sheets complete-tool and format sample checkpoint (2026-10-14):
+
+- Web MCP operations now use the original proposeOperationsImpl/applyChangePlan
+  pipeline. Native table-overlap and pivot-copy refusals preserve source state.
+- Native recovery saves stage the original two-pass writer privately, remapping
+  dependent worksheet IDs before publishing one complete immutable result.
+- Durable failure receipts retain serialization error details; unknown edits are
+  not replayed. Native addressed reads wait for hydration and formula settlement.
+- Permission-checked immutable Drive images feed the original image operation.
+- Parent evidence retains 55 valid operation receipts, real-model browser turns,
+  negative/unknown outcomes, downloaded hashes and a multi-feature OOXML sample.
+  Actual Excel/WPS reopen and full format compatibility remain pending.

@@ -248,19 +248,19 @@ export async function handleSave(
     structuralOps.length > 0 ? tableEdits.filter((edit) => edit.area !== undefined) : []
   const phaseOneTableEdits = tableEdits.filter((edit) => !heldTableEdits.includes(edit))
   const heldNames = hasShifts ? definedNamesState : null
-  const splitSave =
+  const needsStagedSave =
     heldPivots.length > 0 ||
     heldTables.length > 0 ||
     heldTableEdits.length > 0 ||
     heldNames !== null
-  if (splitSave) {
+  if (needsStagedSave) {
     const addedSheetIds = state.editJournal.sheets.added
     const strandedHeld = [
       ...heldPivots.flatMap((pivot) => [pivot.sheetId, pivot.sourceSheetId]),
       ...heldTables.map((table) => table.sheetId),
       ...heldTableEdits.map((edit) => edit.sheetId),
     ].some((sheetId) => addedSheetIds.has(sheetId))
-    if (strandedHeld) {
+    if (strandedHeld && getOfficeHost()?.kind !== 'web') {
       if (mode !== 'recovery') {
         ctx.setMessage(t('appSaveHeldStranded'))
         if (!quiet) showToast(t('appSaveHeldStranded'), 'error')
@@ -268,6 +268,9 @@ export async function handleSave(
       return { ok: false }
     }
   }
+  // The Web runtime stages both native passes before publishing any bytes.
+  // Desktop retains its existing renderer-side save/reopen sequence.
+  const splitSave = needsStagedSave && getOfficeHost()?.kind !== 'web'
   const total =
     edits.length +
     bulkConstantFills.length +
@@ -414,15 +417,15 @@ export async function handleSave(
   if (mode === 'recovery') {
     // Best-effort; a failure only means this tick's copy is skipped — but an
     // unconsumed transfer must not sit in main-process memory until expiry.
-    const written = await getOfficeHost().writeWorkbookRecovery(payload).catch(async () => {
+    const written = await getOfficeHost().writeWorkbookRecovery(payload).catch(async (error:unknown) => {
       await abortStagedEditsTransfer(
         getOfficeHost(),
         state.file.sessionId,
         staged.editsTransferId,
       )
-      return { ok: false }
+      return { ok: false, error:error instanceof Error?error.message:String(error) }
     })
-    return { ok: written.ok === true }
+    return { ok: written.ok === true,...(getOfficeHost()?.kind==='web'&&'error' in written&&typeof written.error==='string'?{error:written.error}:{}) }
   }
   try {
     ctx.setMessage(t('appSavingEdits', { count: total }))

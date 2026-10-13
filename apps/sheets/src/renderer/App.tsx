@@ -4675,7 +4675,7 @@ export function App({
   handleSaveRef.current = handleSave
   getOfficeHost()?.bindWorkbook?.({
     commit:commitActiveEditor,
-    flush:async()=>{if(!await commitActiveEditor())return false;return (await handleSave('recovery',true)).ok},
+    flush:async()=>{if(!await commitActiveEditor())return false;const outcome=await handleSave('recovery',true);if(!outcome.ok&&outcome.error)throw new Error(outcome.error);return outcome.ok},
     dirty:()=>{const state=lazyWorkbookRef.current;return !!state&&(journalSize(state.editJournal)>0||state.file.restoredFromRecovery===true)},
     save:async()=> (await handleSave('save')).ok,
     undo:handleUndo,redo:handleRedo,
@@ -4688,6 +4688,8 @@ export function App({
     hasWorkbook: () =>
       univerRef.current?.univerAPI.getActiveWorkbook() != null && lazyWorkbookRef.current != null,
     context: () => getActiveSheetInfo(),
+    readFeatures: (sheetId) => readSheetFeaturesImpl(readContext(),sheetId),
+    readFormats: (addresses,sheetId) => readFormatsImpl(readContext(),addresses,sheetId),
     // The MCP read is machine-facing: `value` is the model value, not the
     // rendered text a number format or a narrow column produced. The rendered
     // text rides along as `display` when the two differ, so a caller can still
@@ -4747,9 +4749,22 @@ export function App({
         return { ok: false, reason: t('appNoWorkbookOpen') }
       }
       ensureOperationGrids(runtime,ops)
+      // MCP uses the upstream AI planner as well as its executor. Its
+      // semantic gates (pivot/protection/streaming/CAS) must also run for
+      // dry previews; schema validation alone cannot promise a valid edit.
+      const proposed=proposeOperationsImpl({...planContext(),lazyPreviewRef:{current:null},setPreview:()=>{},
+        autoApplySafePlan:async plan=>dryRun?{ok:true}:applyChangePlan(plan,opExecutorContext(runtime,workbook,state),{
+          verifyBeforeApply:()=>{
+            if(lazyWorkbookRef.current!==state||univerRef.current!==runtime||runtime.univerAPI.getActiveWorkbook()?.getId()!==workbook.getId())return {ok:false,reason:t('appApplyTxFailed')}
+            try{if(planStillMatches(plan,lazyWorkbookCellReader(workbook)))return null}catch{}
+            return {ok:false,reason:t('appWorkbookChangedSincePreview')}
+          },
+        }),
+      },ops,'MCP document operation')
+      if(!proposed.ok)return {ok:false,reason:proposed.error}
       if (dryRun) {
         try {
-          const plan = planFromOps(ops, workbook, 'mcp')
+          const plan = proposed.plan
           return {
             ok: true,
             dryRun: true,
@@ -4765,7 +4780,7 @@ export function App({
           return { ok: false, reason: error instanceof Error ? error.message : String(error) }
         }
       }
-      const outcome = await runUiOps(ops)
+      const outcome = await proposed.applied
       if (!outcome.ok) return outcome
       // A formula's text lands synchronously but its result is computed
       // asynchronously, so an immediate read of the cells this batch targeted
@@ -4791,6 +4806,8 @@ export function App({
     return installSheetsMcpBridge({
       hasWorkbook: () => handlers.current?.hasWorkbook() ?? false,
       context: () => handlers.current?.context(),
+      readFeatures: (sheetId) => handlers.current?.readFeatures?.(sheetId),
+      readFormats: (addresses,sheetId) => handlers.current?.readFormats?.(addresses,sheetId),
       readCells: (addresses, sheetId) => handlers.current?.readCells(addresses, sheetId) ?? {},
       sheets: () => handlers.current?.sheets() ?? [],
       focusSheet: (sheetId, address) => handlers.current?.focusSheet(sheetId, address),

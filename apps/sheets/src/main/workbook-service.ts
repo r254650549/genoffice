@@ -79,7 +79,7 @@ async function main(){
      const input=join(root,requestId+'.request'),output=join(root,requestId+'.result')
      let result:unknown
      try{if((await stat(input)).size>limit)throw new Error('XLSX_REQUEST_TOO_LARGE');const request=requestSchema.parse(JSON.parse(await readFile(input,'utf8')));if(request.requestId!==requestId)throw new Error('XLSX_REQUEST_CONFLICT');result={ok:true,value:await service.dispatch(request)}}
-     catch(error){const message=error instanceof Error?error.message:'';result={ok:false,error:/^XLSX_[A-Z_]+$/.test(message)?message:'XLSX_OPERATION_FAILED'}}
+     catch(error){const message=error instanceof Error?error.message:'';result={ok:false,error:/^XLSX_[A-Z_]+$/.test(message)?message:'XLSX_OPERATION_FAILED',...(!/^XLSX_[A-Z_]+$/.test(message)?{detail:message.slice(0,1500)}:{})}}
      await writeFile(output,JSON.stringify(result),{mode:0o600});await unlink(input).catch(()=>{});socket.end('done\n')
     })().catch(()=>socket.destroy()).finally(()=>{active--;lastRequest=Date.now()})
    })

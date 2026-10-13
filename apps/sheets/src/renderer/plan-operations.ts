@@ -53,6 +53,7 @@ import {
 import { SharedFormulaLookup, indexedFormulas, sharedFormulaText } from './shared-formula-index'
 import { CLOSURE_MAX_CELLS, type LazyWorkbookState, type UniverRuntime } from './univer-state'
 import { convertibleType } from './WorkbookVisuals'
+import {fileTableOverlapError} from './table-overlap'
 
 /** App-scope state the plan builders need, threaded explicitly. */
 export interface PlanContext {
@@ -93,6 +94,10 @@ export function proposeOperations(
       // are exempt: they stay range-level and the apply executor loads each
       // chunk before scanning it.
       for (const operation of batch.operations) {
+        if(operation.op==='add_table'){
+          const overlap=fileTableOverlapError(state,operation.sheetId,parseRange(operation.range))
+          if(overlap)return {ok:false,error:overlap}
+        }
         if (operation.op !== 'find_replace' && operation.op !== 'sort_range') continue
         const bounds = parseRange(operation.range)
         if (rangeCellCount(bounds) > MAX_EXPANDED_CELL_OPS) continue
@@ -266,7 +271,8 @@ export function proposeOperations(
           if (
             operation.op === 'add_image' &&
             !/^https?:\/\//i.test(operation.path) &&
-            !/\.(png|jpe?g|gif)$/i.test(operation.path)
+            !/\.(png|jpe?g|gif)$/i.test(operation.path)&&
+            !(getOfficeHost()?.kind==='web'&&/^drive:\/\/[a-f0-9-]{36}\/[1-9]\d*\/[a-f0-9]{64}$/.test(operation.path))
           ) {
             return {
               ok: false,

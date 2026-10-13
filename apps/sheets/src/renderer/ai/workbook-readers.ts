@@ -14,6 +14,7 @@ import { toSelectionFormat } from '../selection-format'
 import { lazyCellReader,ensureLazyRangeLoaded } from '../univer-sync'
 import { ensureAddressableGrid } from '../grid-growth'
 import { journalCellContentAt } from '../edit-journal'
+import {awaitFormulaValues,type FormulaTarget} from '../formula-values'
 import { lazySheetScreenExtent, type LazyWorkbookState, type UniverRuntime } from '../univer-state'
 import type { ActiveSheetInfo, FrozenSelection } from './tools'
 
@@ -220,6 +221,10 @@ export function readSheetFeatures(ctx: WorkbookReadContext, sheetIdInput?: strin
   }
 
   if (state) {
+    const charts=[...state.file.visuals,...state.editJournal.visualAdds].filter(visual=>visual.sheetId===sheetId&&visual.kind==='chart')
+    if(charts.length){lines.push(`Charts: ${charts.length}:`);for(const chart of charts.slice(0,20))lines.push(`- id=${chart.chartPath??chart.id}: ${chart.chart?.title??''} (${chart.chart?.chartTypes.join('+')??''})`)}
+    const sparklines=[...(fileMeta?.sparklines??[]),...state.editJournal.sparklineAdds.filter(group=>group.sheetId===sheetId)]
+    if(sparklines.length){lines.push(`Sparklines: ${sparklines.length} group(s):`);for(const group of sparklines.slice(0,20))lines.push(`- ${group.type}: ${group.cells.slice(0,20).map(cell=>`${cell.cell} <- ${cell.sourceRef}`).join('; ')}`)}
     const visuals = [...state.file.visuals, ...state.editJournal.visualAdds].filter(
       (visual) => visual.sheetId === sheetId && visual.kind !== 'chart',
     )
@@ -229,8 +234,8 @@ export function readSheetFeatures(ctx: WorkbookReadContext, sheetIdInput?: strin
         const origin = visual.id.startsWith('added-shape-')
           ? `id=${visual.id}, editable via edit_shape`
           : visual.id.startsWith('added-')
-            ? 'added this session'
-            : 'came with the file, not modifiable by the AI'
+            ? `id=${visual.id}, added this session`
+            : `id=${visual.id}, came with the file; edit_shape is for session-added shapes only`
         const label =
           visual.kind === 'image'
             ? 'image'
@@ -316,7 +321,10 @@ export function getActiveSheetInfo(
   frozen?: FrozenSelection | null,
 ): ActiveSheetInfo {
   const workbook = ctx.univerRef.current?.univerAPI.getActiveWorkbook()
-  const live = workbook?.getActiveRange()?.getA1Notation() ?? undefined
+  // A row/column deletion can leave Univer's whole-axis selection ending at
+  // the previous grid boundary. That cosmetic selection must not prevent
+  // discovery or the next explicitly addressed document operation.
+  const live = (()=>{try{return workbook?.getActiveRange()?.getA1Notation()??undefined}catch{return undefined}})()
   // A frozen snapshot taken on another sheet has to carry its sheet name, or
   // the model reads a bare A1 as an address on whatever sheet is active now.
   const frozenLabel = frozen
@@ -419,6 +427,7 @@ export async function readLiveDraftCells(ctx:WorkbookReadContext,addresses:reado
   const runtime=ctx.univerRef.current,workbook=runtime?.univerAPI.getActiveWorkbook(),worksheet=sheetId?workbook?.getSheetBySheetId(sheetId):workbook?.getActiveSheet(),initial=ctx.lazyWorkbookRef.current
   if(!runtime||!worksheet||!initial)throw new Error('Worksheet is not ready')
   const result:ReturnType<typeof readCells>={}
+  const pendingFormulas:FormulaTarget[]=[]
   for(const address of [...new Set(addresses)]){
     const {row,column}=parseAddress(address),range={startRow:row,endRow:row,startColumn:column,endColumn:column},id=worksheet.getSheetId()
     ensureAddressableGrid(runtime,worksheet,range)
@@ -429,7 +438,15 @@ export async function readLiveDraftCells(ctx:WorkbookReadContext,addresses:reado
     // are no original bytes to hydrate; do not mistake that for a failed read.
     if(extent&&row<extent.rows&&column<extent.columns&&!await ensureLazyRangeLoaded(runtime,ctx.lazyWorkbookRef,worksheet,range,setMessage))throw new Error('Requested cells could not be loaded')
     if(ctx.lazyWorkbookRef.current!==initial)throw new Error('Workbook changed while reading cells')
-    Object.assign(result,readCells(ctx,[address],sheetId))
+    const cells=readCells(ctx,[address],sheetId)
+    Object.assign(result,cells)
+    if(cells[address]?.formula&&cells[address]?.value===null)pendingFormulas.push({sheetId:id,address})
+  }
+  if(pendingFormulas.length){
+    const settled=await awaitFormulaValues(pendingFormulas,(addresses,id)=>readCells(ctx,addresses,id))
+    if(ctx.lazyWorkbookRef.current!==initial)throw new Error('Workbook changed while reading cells')
+    if(settled.length!==pendingFormulas.length)throw new Error('Formula results are still calculating; read the range again')
+    for(const cell of settled)result[cell.address]={...result[cell.address]!,value:cell.value as CellScalar,rawValue:cell.value as CellScalar}
   }
   return result
 }

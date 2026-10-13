@@ -41,6 +41,7 @@ import {
   updateTableAdd,
 } from './edit-journal'
 import { planFileTableRegistrations } from './file-tables'
+import {fileTableOverlapError} from './table-overlap'
 import { optionsOfTableAdd } from './table-design'
 import { DEFAULT_TABLE_STYLE, builtinTablePalette, tableThemeJson } from './table-styles'
 import { t } from './i18n/locale'
@@ -62,6 +63,8 @@ export function applyAiTableAdd(
   }
   const width = bounds.endColumn - bounds.startColumn + 1
   if (width > 1_000) throw new Error(t('appTableTooWide'))
+  const overlap=fileTableOverlapError(state,op.sheetId,bounds)
+  if(overlap)throw new Error(overlap)
   const fileTableNames = planFileTableRegistrations(state.file.sheets).map(
     (table) => table.tableName,
   )

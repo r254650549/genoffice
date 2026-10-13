@@ -43,7 +43,15 @@ const host:OfficeHost={
  signalMcpReady(){loading=false;notify('ready',[])},
  notifyPendingEdits(){},
  reportCloseSaveResult(ok){notify('reportCloseSaveResult',[ok])},
- async reportMcpResult(result){try{await flush();await request('reportMcpResult',[{...result,revision}])}finally{commands=false;document.body.inert=false}},
+ async reportMcpResult(result){try{
+  try{await flush()}catch(error){
+   // An applied edit whose draft publication failed is not a completed
+   // operation. Still deliver a durable failure receipt instead of letting
+   // the caller time out and repeat an edit with an unknown outcome.
+   await request('reportMcpResult',[{...result,ok:false,error:`草稿未持久化，当前修改仍在编辑器中：${String(error)}`,revision}]);return
+  }
+  await request('reportMcpResult',[{...result,revision}])
+ }finally{commands=false;document.body.inert=false}},
  selectWorkbook:()=>call('selectWorkbook',[]),
  saveWorkbookEdits:async value=>{const captured=revision,result=await call('saveWorkbookEdits',[value]);if(!result.canceled)published=captured;return result},
  writeWorkbookRecovery:async value=>{const captured=revision,result=await call('writeWorkbookRecovery',[value]);if(result.ok)published=captured;return result},

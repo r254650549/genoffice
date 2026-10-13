@@ -1,4 +1,5 @@
 import {getOfficeHost} from './office-host'
+import {duplicateWorksheet} from './sheet-copy'
 /**
  * Applies a planned batch of workbook operations to the live Univer workbook:
  * prechecks, one undo item per batch, per-op facade calls and journal
@@ -585,7 +586,9 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
     else sheetById(op.sheetId).showColumns(columnIndex(op.column), op.count)
   } else if (op.op === 'duplicate_sheet') {
     if (!workbook) throw new Error(t('appNoWorkbookOpen'))
-    const copy = workbook.duplicateSheet(sheetById(op.sheetId))
+    // Univer returns the active source when a copy command is refused (for
+    // example a pivot/protected sheet). Never rename that source as a copy.
+    const copy=duplicateWorksheet(workbook,sheetById(op.sheetId))
     run.markApplied()
     if (op.name) copy.setName(op.name)
   } else if (op.op === 'set_sheet_hidden') {
