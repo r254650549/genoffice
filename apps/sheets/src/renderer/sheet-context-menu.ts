@@ -21,7 +21,10 @@ export interface SheetContextMenuAction {
 
 export function sheetContextMenuAction(target: EventTarget | null): SheetContextMenuAction {
   if (!(target instanceof Element)) return { statsMenu: false, suppressNativeMenu: false }
-  const footer = target.closest('#univer-container section[data-range-selector]')
+  const section = target.closest('#univer-container section[data-range-selector]')
+  // Both the canvas and footer carry data-range-selector. Only the footer
+  // contains the sheet tablist; the shared attribute does not identify it.
+  const footer = section?.querySelector('[role="tablist"]') ? section : null
   // Univer owns the footer; right-clicking it outside the tab strip opens ours.
   if (footer && !footer.firstElementChild?.contains(target))
     return { statsMenu: true, suppressNativeMenu: true }

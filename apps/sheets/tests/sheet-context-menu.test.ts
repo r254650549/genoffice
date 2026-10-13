@@ -60,11 +60,19 @@ describe('sheet context menu action', () => {
     })
   })
 
+  it('does not open footer statistics on the canvas range-selector section', () => {
+    const canvas = el('canvas', 'div|id=univer-container', 'section|data-range-selector=')
+    canvas.parentElement!.prepend(document.createElement('div'))
+    expect(sheetContextMenuAction(canvas)).toEqual({ statsMenu: false, suppressNativeMenu: true })
+  })
+
   it('opens our stats menu for the footer strip below the sheet tabs', () => {
     // real footer shape: section[data-range-selector] > [tab strip, stats area]
     const section = document.createElement('section')
     section.setAttribute('data-range-selector', '')
-    section.appendChild(document.createElement('div')) // the sheet tab strip
+    const tabs = document.createElement('div')
+    tabs.setAttribute('role', 'tablist')
+    section.appendChild(tabs)
     const stats = document.createElement('div')
     section.appendChild(stats)
     const container = document.createElement('div')

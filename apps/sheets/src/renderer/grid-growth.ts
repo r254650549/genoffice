@@ -43,6 +43,9 @@ export interface GridEdge {
   /// first visible column and row, 0-based (Univer's own indices)
   readonly startColumn: number
   readonly startRow: number
+  /// Last visible indices account for wide windows, zoom and narrow columns.
+  readonly endColumn?: number
+  readonly endRow?: number
   /// the grid's present size, in columns and rows
   readonly columnCount: number
   readonly rowCount: number
@@ -62,11 +65,17 @@ export interface GridGrowth {
  */
 export function nextGridGrowth(edge: GridEdge): GridGrowth | null {
   let columnCount = edge.columnCount
-  if (columnCount < LAST_COLUMN_INDEX + 1 && edge.startColumn + COLUMN_LOOKAHEAD >= columnCount) {
+  if (
+    columnCount < LAST_COLUMN_INDEX + 1 &&
+    (edge.endColumn ?? edge.startColumn) + COLUMN_LOOKAHEAD >= columnCount
+  ) {
     columnCount = Math.min(columnCount + COLUMN_STEP, LAST_COLUMN_INDEX + 1)
   }
   let rowCount = edge.rowCount
-  if (rowCount < LAST_ROW_INDEX + 1 && edge.startRow + ROW_LOOKAHEAD >= rowCount) {
+  if (
+    rowCount < LAST_ROW_INDEX + 1 &&
+    (edge.endRow ?? edge.startRow) + ROW_LOOKAHEAD >= rowCount
+  ) {
     rowCount = Math.min(rowCount + ROW_STEP, LAST_ROW_INDEX + 1)
   }
   if (columnCount === edge.columnCount && rowCount === edge.rowCount) return null
@@ -78,13 +87,7 @@ interface ScrollCommandParams {
   readonly sheetViewStartRow?: number
 }
 
-interface SkeletonLike {
-  readonly scrollX: number
-  getColWidth(index: number): number
-}
-
 interface SkeletonManagerLike {
-  getCurrentSkeleton(): SkeletonLike | null
   reCalculate(): void
 }
 
@@ -115,12 +118,8 @@ const SET_ACTIVE_SHEET_OPERATION = 'sheet.operation.set-worksheet-active'
  *   - a slow poll, for a scroll the command path does not cover, and because
  *     the render unit only exists a moment after install
  *
- * The poll reads the viewport from the skeleton rather than the command stream,
- * so it can answer before any scroll command has arrived. Its early bail reads
- * the command stream's lastColumn to skip the width walk, which narrows the
- * poll: a scroll the command path genuinely misses now goes ungrown until a
- * later command moves lastColumn. The command fires on wheel, scrollbar and
- * keyboard alike, so that miss is rare.
+ * The poll reads the actual visible range, including its right/bottom edge,
+ * so initial layout, resizing and zooming also grow the grid without a scroll.
  *
  * Returns a disposer.
  */
@@ -129,12 +128,13 @@ export function installGridGrowth(runtime: UniverRuntime): () => void {
   // The render unit appears after install, so resolve it per use and cache only
   // once it resolves: a cached miss would pin the growth off forever.
   let skeletonManager: SkeletonManagerLike | null = null
+  let skeletonUnitId: string | null = null
 
   const currentSkeletonManager = (): SkeletonManagerLike | null => {
-    if (skeletonManager) return skeletonManager
     try {
       const workbook = runtime.univerAPI.getActiveWorkbook()
       if (!workbook) return null
+      if (skeletonManager && skeletonUnitId === workbook.getId()) return skeletonManager
       const injector = (
         runtime.univer as unknown as { __getInjector(): InjectorLike }
       ).__getInjector()
@@ -143,6 +143,7 @@ export function installGridGrowth(runtime: UniverRuntime): () => void {
         .getRenderById(workbook.getId())
       if (!render) return null
       skeletonManager = render.with<SkeletonManagerLike>(SheetSkeletonManagerService)
+      skeletonUnitId = workbook.getId()
       return skeletonManager
     } catch {
       return null
@@ -153,9 +154,14 @@ export function installGridGrowth(runtime: UniverRuntime): () => void {
     if (disposed) return
     const worksheet = runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
     if (!worksheet) return
+    // The first visible column alone misses a viewport wider than the entire
+    // initial grid: it remains at A and cannot scroll far enough to grow.
+    const visible = worksheet.getVisibleRange?.()
     const growth = nextGridGrowth({
       startColumn,
       startRow,
+      endColumn: Math.max(startColumn, visible?.endColumn ?? startColumn),
+      endRow: Math.max(startRow, visible?.endRow ?? startRow),
       columnCount: worksheet.getMaxColumns(),
       rowCount: worksheet.getMaxRows(),
     })
@@ -189,20 +195,6 @@ export function installGridGrowth(runtime: UniverRuntime): () => void {
   let lastColumn = 0
   let lastRow = 0
 
-  /**
-   * The first column the viewport shows, read from the skeleton: walk the
-   * column widths until they cover the scrolled distance. Independent of the
-   * command stream, so it also answers when no scroll command has arrived.
-   */
-  const firstVisibleColumn = (skeleton: SkeletonLike, columnCount: number): number => {
-    let x = 0
-    for (let i = 0; i < columnCount; i++) {
-      x += skeleton.getColWidth(i)
-      if (x > skeleton.scrollX) return i
-    }
-    return Math.max(0, columnCount - 1)
-  }
-
   const onCommand = runtime.univerAPI.onCommandExecuted(
     (command: { id?: string; params?: unknown }) => {
       if (command?.id === SET_ACTIVE_SHEET_OPERATION) {
@@ -225,18 +217,10 @@ export function installGridGrowth(runtime: UniverRuntime): () => void {
   const timer = window.setInterval(() => {
     if (disposed) return
     const worksheet = runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
-    const manager = currentSkeletonManager()
-    if (!worksheet || !manager) return
-    const skeleton = manager.getCurrentSkeleton()
-    if (!skeleton) return
-    const columnCount = worksheet.getMaxColumns()
-    // Walking the widths costs one getColWidth per column, and this runs four
-    // times a second, so return while the last scroll command put the viewport
-    // well inside the grid: the walk could only confirm there is nothing to
-    // grow. This trades backstop coverage for the walk — see the note above.
-    if (lastColumn + COLUMN_LOOKAHEAD < columnCount) return
-    const walked = firstVisibleColumn(skeleton, columnCount)
-    growIfNearEdge(walked, lastRow)
+    if (!worksheet) return
+    const visible = worksheet.getVisibleRange?.()
+    if (!visible) return
+    growIfNearEdge(visible.startColumn, visible.startRow)
   }, 250)
 
   return () => {

@@ -12,6 +12,10 @@ import type { UniverRuntime } from '../src/renderer/univer-state'
 const BLANK = { startColumn: 0, startRow: 0, columnCount: 26, rowCount: 1000 } as const
 
 describe('nextGridGrowth', () => {
+  it('fills a wide viewport parked at A1 without requiring a scroll first', () => {
+    expect(nextGridGrowth({ ...BLANK, endColumn: 25, endRow: 55 })).toEqual({ columnCount: 52, rowCount: 1000 })
+    expect(nextGridGrowth({ ...BLANK, columnCount: 78, endColumn: 34, endRow: 55 })).toBeNull()
+  })
   it('leaves a blank sheet alone until the viewport nears an edge', () => {
     // column 0 + 20 columns of lookahead < 26, so opening a blank sheet must
     // not immediately grow anything

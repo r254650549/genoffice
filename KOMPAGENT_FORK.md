@@ -82,3 +82,14 @@ XLSX runtime extraction (2026-10-13, Web integration still pending):
   ranges, formulas, formatting, multiple sheets, immutable save, reopen, range
   limits, expired sessions and untouched OOXML parts. It does not constitute
   browser, Agent or user-execution-environment acceptance.
+
+Sheets viewport/context-menu fixes (2026-10-13):
+
+- Grow the existing virtual grid from its visible right/bottom edge, including
+  initial layout and window resizing. Wide views at A1 no longer end at Z;
+  growth remains a view mutation outside document edits and undo history.
+- Distinguish the footer by its sheet tablist. Both the canvas and footer use
+  `data-range-selector`, so that attribute alone opened the statistics popup
+  together with the cell context menu.
+- Existing grid-growth and menu suites: 19 tests pass. Parent browser evidence
+  verifies AA-column editing and a single cell menu on a wide viewport.
