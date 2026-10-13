@@ -5,6 +5,7 @@ const pending = new Map<string, {resolve(value: unknown): void; reject(error: Er
 const listeners = new Map<string, Set<(value: unknown) => void>>()
 let externalState: readonly unknown[] | undefined
 let revision = 0
+let publishedRevision = -1
 let snapshot: (() => Promise<Uint8Array | null>) | undefined
 let stopObserving: (() => void) | undefined
 let draftTimer: ReturnType<typeof setTimeout> | undefined
@@ -42,13 +43,15 @@ window.addEventListener('message', event => {
     clearTimeout(item.timer);pending.delete(message.id)
     if (message.error) item.reject(new Error(message.error));else item.resolve(message.value)
   } else if (message.kind === 'event' && typeof message.method === 'string') {
+    if (String(message.method) === 'pauseEditing') {document.body.inert=true;return}
+    if (String(message.method) === 'resumeEditing') {document.body.inert=false;return}
     if (message.method === 'onTeardown') {tornDown=true;if(draftRetry)clearTimeout(draftRetry);if(draftTimer)clearTimeout(draftTimer);stopObserving?.()}
     if (String(message.method) === 'flushDraft') {void flushDraft().then(() => notify('flushed', [message.id])).catch(error => notify('flushFailed', [message.id,String(error)]));return}
     for (const listener of listeners.get(message.method) ?? []) listener(message.value)
   }
 })
 function flushDraft(): Promise<void> {
-  if (session.readOnly || tornDown) return Promise.resolve()
+  if (session.readOnly || tornDown || revision === publishedRevision) return publishing
   if (draftTimer) clearTimeout(draftTimer)
   if (draftRetry) clearTimeout(draftRetry)
   publishing = publishing.catch(() => {}).then(async () => {
@@ -57,7 +60,7 @@ function flushDraft(): Promise<void> {
     for (;;) {
       const captured = revision, bytes = await snapshot?.()
       if (captured !== revision) continue
-      if (bytes) await request('draft', [{revision: captured, bytes}])
+      if (bytes) {await request('draft', [{revision: captured, bytes}]);publishedRevision=captured}
       retryDelay = 1000
       return
     }
@@ -71,8 +74,9 @@ function flushDraft(): Promise<void> {
   })
   return publishing
 }
-const session = await request('session', []) as {revision: number;readOnly:boolean}
+const session = await request('session', []) as {revision: number;readOnly:boolean;hasContent:boolean}
 revision = session.revision
+publishedRevision = session.hasContent ? session.revision : -1
 const host: OfficeHost = {
   kind: 'web',
   readOnly: session.readOnly,
