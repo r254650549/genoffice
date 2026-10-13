@@ -1,3 +1,4 @@
+import { getOfficeHost } from '../office-host'
 import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
@@ -342,11 +343,11 @@ interface AiPanelProps {
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
-  getSettings: () => window.desktop.getAiSettings(),
-  setSettings: (settings) => window.desktop.setAiSettings(settings),
-  onSettingsChanged: (handler) => window.desktop.onAiSettingsChanged(handler),
-  gskLoggedIn: () => window.desktop.aiGskStatus().then((s) => !!s?.loggedIn),
-  openModelSettings: () => window.desktop.openAiModelSettings().catch(() => {}),
+  getSettings: () => getOfficeHost().getAiSettings(),
+  setSettings: (settings) => getOfficeHost().setAiSettings(settings),
+  onSettingsChanged: (handler) => getOfficeHost().onAiSettingsChanged(handler),
+  gskLoggedIn: () => getOfficeHost().aiGskStatus().then((s) => !!s?.loggedIn),
+  openModelSettings: () => getOfficeHost().openAiModelSettings().catch(() => {}),
 }
 
 export function AiPanel({
@@ -398,8 +399,8 @@ export function AiPanel({
   // on mount and before each send so a freshly starred file is answerable
   const kbFilesRef = useRef<KbFileInfo[]>([])
   const refreshKbFiles = (): Promise<void> => {
-    if (typeof window.desktop?.kbList !== 'function') return Promise.resolve()
-    return window.desktop
+    if (typeof getOfficeHost()?.kbList !== 'function') return Promise.resolve()
+    return getOfficeHost()
       .kbList()
       .then((files) => {
         kbFilesRef.current = files
@@ -455,7 +456,7 @@ export function AiPanel({
     for (const a of wanted) {
       if (!ATTACHMENT_IMAGE_EXTS.has(a.ext) || previewRequestedRef.current.has(a.path)) continue
       previewRequestedRef.current.add(a.path)
-      void window.desktop
+      void getOfficeHost()
         .readAttachmentImage(a.path)
         .then((r) => {
           if (!previewRequestedRef.current.has(a.path)) return // removed while the read was in flight
@@ -537,7 +538,7 @@ export function AiPanel({
     let alive = true
     const refresh = () => {
       // tests render the panel without a preload bridge
-      void window.desktop
+      void getOfficeHost()
         ?.aiGskStatus?.()
         .then((s) => {
           if (alive) gskLoggedInRef.current = !!s?.loggedIn
@@ -819,12 +820,12 @@ export function AiPanel({
         // buildContext then returns '' and the skill stays out of the way.
         // Mounted only when the bridge carries the kb channel at all: a test
         // mock or an older preload must not grow tools that cannot execute.
-        ...(typeof window.desktop?.kbList === 'function'
+        ...(typeof getOfficeHost()?.kbList === 'function'
           ? [
               createKnowledgeBaseSkill({
                 listFiles: () => kbFilesRef.current,
-                search: (query, limit) => window.desktop.kbSearch({ q: query, limit }),
-                read: (path, offset) => window.desktop.kbRead(path, offset),
+                search: (query, limit) => getOfficeHost().kbSearch({ q: query, limit }),
+                read: (path, offset) => getOfficeHost().kbRead(path, offset),
               }),
             ]
           : []),
@@ -949,7 +950,7 @@ export function AiPanel({
           // gsk status rather than matching the localized error text — but only
           // when Genspark is the provider: a BYOK user's error (e.g. their own
           // provider's rate limit) must not advertise a Genspark sign-in (#1948)
-          void window.desktop
+          void getOfficeHost()
             .aiGskStatus()
             .then((status) => {
               if (status.loggedIn) return
@@ -1039,7 +1040,7 @@ export function AiPanel({
   }
   // [name](filenav:///abs/path) citations open the cited file in its own app
   const fileNav = createFileNav((path) => {
-    void window.desktop.openSourcePath(path)
+    void getOfficeHost().openSourcePath(path)
   })
 
   // follow the stream, but stop yanking once the user scrolls up to read;
@@ -1065,7 +1066,7 @@ export function AiPanel({
     const images: AgentImage[] = []
     const failures: string[] = []
     for (const att of imageAtts.slice(0, MAX_IMAGES_PER_MESSAGE)) {
-      const result = await window.desktop.readAttachmentImage(att.path)
+      const result = await getOfficeHost().readAttachmentImage(att.path)
       if (result.ok && result.base64 && result.mime) {
         images.push({ base64: result.base64, mime: result.mime })
       } else {
@@ -1261,31 +1262,31 @@ export function AiPanel({
     }
   }
 
-  const pickAttachments = async () => mergeAttachments(await window.desktop.pickAttachments())
+  const pickAttachments = async () => mergeAttachments(await getOfficeHost().pickAttachments())
 
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setDragOver(false)
     const paths = Array.from(e.dataTransfer.files)
-      .map((f) => window.desktop.getPathForFile(f))
+      .map((f) => getOfficeHost().getPathForFile(f))
       .filter(Boolean)
-    if (paths.length > 0) mergeAttachments(await window.desktop.addAttachmentPaths(paths))
+    if (paths.length > 0) mergeAttachments(await getOfficeHost().addAttachmentPaths(paths))
   }
 
   /** Files pasted into the input: ones with a local path go through regular attachments; pure bitmaps like screenshots hit a temp file first */
   const onPasteFiles = async (files: File[]) => {
     const paths: string[] = []
     for (const f of files) {
-      const p = window.desktop.getPathForFile(f)
+      const p = getOfficeHost().getPathForFile(f)
       if (p) {
         paths.push(p)
         continue
       }
       const ext = PASTE_MIME_EXT[f.type] ?? f.name.split('.').pop()?.toLowerCase() ?? 'bin'
-      mergeAttachments(await window.desktop.addPastedImage(await f.arrayBuffer(), ext))
+      mergeAttachments(await getOfficeHost().addPastedImage(await f.arrayBuffer(), ext))
     }
-    if (paths.length > 0) mergeAttachments(await window.desktop.addAttachmentPaths(paths))
+    if (paths.length > 0) mergeAttachments(await getOfficeHost().addAttachmentPaths(paths))
   }
 
   const removeAttachment = (path: string) =>
@@ -1402,7 +1403,7 @@ export function AiPanel({
         <div className="ai-panel-header-actions">
           <AiPanelSideButton
             lang={lang}
-            onMove={(side) => window.desktop.setAiPanelPrefs({ side })}
+            onMove={(side) => getOfficeHost().setAiPanelPrefs({ side })}
           />
           {(chat.length > 0 || historicChat.length > 0) && (
             <button
@@ -1527,7 +1528,7 @@ export function AiPanel({
                 <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>
               )}
               {entry.loginRequired && (
-                <button className="ai-login-btn" onClick={() => void window.desktop.aiGskLogin()}>
+                <button className="ai-login-btn" onClick={() => void getOfficeHost().aiGskLogin()}>
                   {t('aiGskLoginBtn')}
                 </button>
               )}

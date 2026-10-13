@@ -1,9 +1,10 @@
+import { getOfficeHost } from './office-host'
 import type { Editor } from '@tiptap/react'
 import { BLANK_BULLET_NUM_ID, BLANK_ORDERED_NUM_ID } from '@genoffice/docx-engine'
 import type { McpCommandMessage, McpEditorCommand } from '../shared/ipc'
 import { executeTool, markDocSeen } from './ai/tools'
 import { findNumId, type NumIds } from './ai/protocol'
-import { save, type FileActionContext } from './file-actions'
+import { buildDocBytes, save, type FileActionContext } from './file-actions'
 
 /**
  * MCP bridge (renderer half).
@@ -212,7 +213,7 @@ async function announceWhenLoaded(
 
 /** Subscribe the live editor to MCP commands. Returns the unsubscribe function. */
 export function installMcpBridge(deps: McpBridgeDeps): () => void {
-  const desktop = window.desktop
+  const desktop = getOfficeHost()
   if (!desktop?.onMcpCommand || !desktop.reportMcpResult) return () => {}
   let cancelled = false
   let queue: Promise<void> = Promise.resolve()
@@ -220,6 +221,7 @@ export function installMcpBridge(deps: McpBridgeDeps): () => void {
     if (!message || typeof message.requestId !== 'string') return
     queue = queue.then(async () => {
       try {
+        desktop.beforeMcpCommand?.(message)
         const result = await runCommand(deps, message.command, message.payload)
         desktop.reportMcpResult({ requestId: message.requestId, ok: true, result })
       } catch (error) {
@@ -234,7 +236,17 @@ export function installMcpBridge(deps: McpBridgeDeps): () => void {
   // Let the shell know this tab can accept commands (device for targeted routing).
   void announceWhenLoaded(
     deps,
-    () => desktop.signalMcpReady?.(),
+    () => {
+      desktop.bindDocument?.(() => buildDocBytes(deps.getCtx()), (listener) => {
+        const editor = deps.getCtx().editor!
+        const changed = ({ transaction }: { transaction: { docChanged: boolean } }) => {
+          if (transaction.docChanged && !deps.getCtx().saveInFlightRef.current) listener()
+        }
+        editor.on('transaction', changed)
+        return () => { editor.off('transaction', changed) }
+      })
+      desktop.signalMcpReady?.()
+    },
     () => cancelled,
   )
   return () => {

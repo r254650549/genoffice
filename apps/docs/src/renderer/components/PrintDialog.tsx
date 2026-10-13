@@ -1,3 +1,4 @@
+import { getOfficeHost } from '../office-host'
 /**
  * Print dialog modeled on Word's print sheet (same pattern as the slides app):
  * live page preview on the left (a scaled clone of the pagination-preview page
@@ -120,7 +121,7 @@ export function PrintDialog({
     els.forEach((el, i) => el.classList.toggle('pv-print-skip', !sel.has(i)))
     const scale = setPrintZoom()
     try {
-      const r = await window.desktop.print(scale)
+      const r = await getOfficeHost().print(scale)
       if (r.ok) {
         onClose()
         return

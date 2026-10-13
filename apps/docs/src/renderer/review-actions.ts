@@ -1,3 +1,4 @@
+import { getOfficeHost } from './office-host'
 /**
  * Review-tab actions: footnotes/endnotes, comments, revisions, ink
  * annotations and compare (document protection lives in ProtectDialog +
@@ -348,7 +349,7 @@ export function clearInks(ctx: ReviewContext): void {
 /** Compare: pick a second .docx and diff it against the open document */
 export async function compareWithFile(ctx: ReviewContext): Promise<void> {
   if (!ctx.doc) return
-  const other = await window.desktop.openDocx()
+  const other = await getOfficeHost().openDocx()
   if (!other) return
   // password-protected comparison target: not wired through the decrypt prompt (yet)
   if ('needsPassword' in other) {

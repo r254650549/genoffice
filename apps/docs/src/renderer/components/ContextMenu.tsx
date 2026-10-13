@@ -1,3 +1,4 @@
+import { getOfficeHost } from '../office-host'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Command } from '@tiptap/pm/state'
@@ -156,7 +157,7 @@ export function EditorContextMenu({
   useEffect(() => {
     if (!spell) return
     let alive = true
-    void window.desktop.spellLanguages?.().then((langs) => {
+    void getOfficeHost().spellLanguages?.().then((langs) => {
       if (alive) setSpellLangs(langs)
     })
     return () => {
@@ -186,14 +187,14 @@ export function EditorContextMenu({
       menu.pos ?? null,
       spell.word,
       replacement,
-      window.desktop.spellReplace,
+      getOfficeHost().spellReplace,
     )
   }
   const addToDictionary = () => {
-    if (spell) void window.desktop.spellAddWord?.(spell.word).then(() => onRespell?.())
+    if (spell) void getOfficeHost().spellAddWord?.(spell.word).then(() => onRespell?.())
   }
   const ignoreAll = () => {
-    if (spell) void window.desktop.spellIgnoreWord?.(spell.word).then(() => onRespell?.())
+    if (spell) void getOfficeHost().spellIgnoreWord?.(spell.word).then(() => onRespell?.())
   }
   const toggleLanguage = (code: string) => {
     if (!spellLangs) return
@@ -203,7 +204,7 @@ export function EditorContextMenu({
     if (!active.length) return
     // the respell kick that follows must not run under an open menu (Word closes it too)
     onClose()
-    void window.desktop.spellSetLanguages?.(active).then(() => onRespell?.())
+    void getOfficeHost().spellSetLanguages?.(active).then(() => onRespell?.())
   }
 
   const { from, to } = editor.state.selection
@@ -253,7 +254,7 @@ export function EditorContextMenu({
     window.addEventListener('blur', onClose)
     // shell tab-strip presses never reach this document; the preload relays
     // them (app:chrome-pressed) so the menu still dismisses
-    const offChrome = window.desktop?.onChromePressed?.(onClose)
+    const offChrome = getOfficeHost()?.onChromePressed?.(onClose)
     return () => {
       window.removeEventListener('mousedown', close)
       window.removeEventListener('keydown', onKey)

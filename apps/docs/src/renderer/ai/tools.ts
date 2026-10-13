@@ -1,3 +1,4 @@
+import { getOfficeHost } from '../office-host'
 import type { Editor } from '@tiptap/core'
 import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { ChartDisplay, CommentInfo, NewChart, NoteInfo } from '@genoffice/docx-engine'
@@ -869,7 +870,7 @@ async function executeAsyncTool(
     case 'web_search': {
       const query = String(call.input.query ?? '').trim()
       if (!query) return fail(t('aiSumWebSearch'), 'query must not be empty')
-      const r = await window.desktop.webSearch(query, Number(call.input.maxResults) || 6)
+      const r = await getOfficeHost().webSearch(query, Number(call.input.maxResults) || 6)
       // a backend failure must not read as "no results" — the model would fabricate conclusions
       if (r.method === 'error') {
         return fail(
@@ -891,7 +892,7 @@ async function executeAsyncTool(
     case 'image_search': {
       const query = String(call.input.query ?? '').trim()
       if (!query) return fail(t('aiSumImageSearch'), 'query must not be empty')
-      const r = await window.desktop.imageSearch(query, Number(call.input.maxResults) || 8)
+      const r = await getOfficeHost().imageSearch(query, Number(call.input.maxResults) || 8)
       // a backend failure must not read as an empty gallery — the model would fabricate image choices
       if (r.method === 'error') {
         return fail(
@@ -931,7 +932,7 @@ async function executeAsyncTool(
           'give blockIndex (an image block of the document) or mediaUrls (URLs / local file paths)',
         )
       }
-      const r = await window.desktop.analyzeMedia({ mediaUrls: urls, requirements })
+      const r = await getOfficeHost().analyzeMedia({ mediaUrls: urls, requirements })
       if (!r.text) return fail(t('aiSumAnalyzeMedia'), r.error ?? 'media analysis failed')
       // analysis text can be long: keep the head of it, like the other readers
       const MAX_ANALYSIS_CHARS = 6000
@@ -956,7 +957,7 @@ async function executeAsyncTool(
       const prompt = String(call.input.prompt ?? '').trim()
       if (!prompt) return fail(t('aiSumGenerateImage'), 'prompt must not be empty')
       const aspectRatio = String(call.input.aspectRatio ?? '').trim()
-      const generated = await window.desktop.aiGenerateImage({
+      const generated = await getOfficeHost().aiGenerateImage({
         prompt,
         ...(aspectRatio ? { aspectRatio } : {}),
       })
@@ -1000,7 +1001,7 @@ async function executeAsyncTool(
           return fail(t('aiSumCreateDocument'), e instanceof Error ? e.message : String(e))
         }
       }
-      const r = await window.desktop.createDocument({ type, title, content })
+      const r = await getOfficeHost().createDocument({ type, title, content })
       if (!r.ok) return fail(t('aiSumCreateDocument'), r.error ?? 'creating the document failed')
       const name = `${title}.${type}`
       return {
@@ -1044,7 +1045,7 @@ async function setPictureWatermark(
     return fail(summary, 'image must be an http(s) or data: image URL')
   const fetched = url.startsWith('data:')
     ? { base64: url.slice(url.indexOf(',') + 1) }
-    : await window.desktop.fetchImage(url)
+    : await getOfficeHost().fetchImage(url)
   if (signal?.aborted) return fail(summary, 'stopped by the user; the watermark was not set')
   if (!fetched) return fail(summary, 'download failed (the image may not be accessible)')
   const mime = sniffImageMime(fetched.base64)
@@ -1091,7 +1092,7 @@ async function insertPicture(
   if ('error' in at) return fail(summary, at.error)
   const fetched = url.startsWith('data:')
     ? { base64: url.slice(url.indexOf(',') + 1) }
-    : await window.desktop.fetchImage(url)
+    : await getOfficeHost().fetchImage(url)
   if (signal?.aborted) return fail(summary, 'stopped by the user; the picture was not inserted')
   if (!fetched) return fail(summary, 'download failed (the image may not be accessible)')
   const mime = sniffImageMime(fetched.base64)
@@ -1134,7 +1135,7 @@ async function insertImageFromUrl(
   signal: AbortSignal | undefined,
   labels: { failLabel: string; doneLabel: string; blockLabel: string },
 ): Promise<ToolExecution> {
-  const fetched = await window.desktop.fetchImage(url)
+  const fetched = await getOfficeHost().fetchImage(url)
   // never write after the user hit stop (the download may resolve long after the abort)
   if (signal?.aborted)
     return fail(labels.failLabel, 'stopped by the user; the image was not inserted')

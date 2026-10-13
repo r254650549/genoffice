@@ -1,3 +1,4 @@
+import { getOfficeHost } from '../office-host'
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Lang } from '@genoffice/i18n'
@@ -1110,7 +1111,7 @@ function RibbonInner({
   }
 
   const replacePicture = async () => {
-    const picked = await window.desktop.pickImage()
+    const picked = await getOfficeHost().pickImage()
     if (!picked) return
     await applyPictureBytes(`data:${picked.mime};base64,${picked.base64}`)
   }
@@ -3027,7 +3028,7 @@ function RibbonInner({
                   <span className="rb-big-icon">
                     <GensparkMark size={26} />
                   </span>
-                  <span>Genspark AI</span>
+                  <span>{getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}</span>
                 </button>
                 <button
                   className="rb-big ai-entry"
@@ -3127,7 +3128,7 @@ function RibbonInner({
                   <span>{t('aiTidyBtn')}</span>
                 </button>
               </div>
-              <div className="ribbon-group-label">Genspark AI</div>
+              <div className="ribbon-group-label">{getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}</div>
             </div>
 
             <div className="ribbon-sep" />

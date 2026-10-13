@@ -1,3 +1,4 @@
+import { getOfficeHost } from './office-host'
 /**
  * Document lifecycle: open/new (full state reset from a parsed docx), the
  * save pipeline (PM doc → save plan → docx bytes → reparse), and PDF export.
@@ -532,7 +533,7 @@ export async function loadFile(
     } else {
       ctx.setStatus(t('appOpenedFile', { name: result.name }))
     }
-    void window.desktop.getRecentFiles().then(ctx.setRecent)
+    void getOfficeHost().getRecentFiles().then(ctx.setRecent)
     return 'ok'
   } catch (err) {
     if (generation !== openGeneration) return 'superseded'
@@ -545,7 +546,7 @@ export async function loadFile(
 
 async function systemLocale(): Promise<string> {
   try {
-    return (await window.desktop.getSystemLocale?.()) || navigator.language
+    return (await getOfficeHost().getSystemLocale?.()) || navigator.language
   } catch {
     return navigator.language
   }
@@ -832,7 +833,7 @@ export async function writeRecoveryCopy(ctx: FileActionContext): Promise<void> {
       bytes.byteOffset,
       bytes.byteOffset + bytes.byteLength,
     ) as ArrayBuffer
-    await window.desktop.writeRecoveryCopy(doc.filePath, buffer)
+    await getOfficeHost().writeRecoveryCopy(doc.filePath, buffer)
   } catch {
     /* best-effort */
   }
@@ -849,10 +850,10 @@ const runSerializedSave = createSaveSerializer()
 function discardStalePasswordIntents(): void {
   // Start the IPC now, before the replacement document can record a password.
   // The destructive half stays serialized behind an old in-flight save.
-  const throughRevision = window.desktop.docPasswordIntentRevision()
+  const throughRevision = getOfficeHost().docPasswordIntentRevision()
   void runSerializedSave(
     async () => {
-      await window.desktop.discardDocPasswordIntents(await throughRevision)
+      await getOfficeHost().discardDocPasswordIntents(await throughRevision)
       return false // not a save: a queued save pass must never reuse this result
     },
     () => false,
@@ -1007,7 +1008,7 @@ async function saveOnce(
     if (explicitTarget) {
       // MCP-driven explicit output: no dialog, no derived name — always write to
       // the caller's path (overwrite policy is enforced in the main process).
-      const result = await window.desktop.saveDocxTo(
+      const result = await getOfficeHost().saveDocxTo(
         explicitTarget.path,
         buffer,
         explicitTarget.overwrite,
@@ -1029,8 +1030,8 @@ async function saveOnce(
       // Save As keeps the dialog; a new document's first save lands silently in the default
       // folder. The source path identifies the desired password state to snapshot.
       const result = saveAs
-        ? await window.desktop.saveDocxAs(autoName ?? doc.fileName, buffer, doc.filePath)
-        : await window.desktop.saveDocxNew(newDocName ?? autoName ?? doc.fileName, buffer)
+        ? await getOfficeHost().saveDocxAs(autoName ?? doc.fileName, buffer, doc.filePath)
+        : await getOfficeHost().saveDocxNew(newDocName ?? autoName ?? doc.fileName, buffer)
       if (!result.ok) {
         if (result.error) {
           ctx.setStatus(t('appSaveFailed', { error: result.error }))
@@ -1043,7 +1044,7 @@ async function saveOnce(
       if (result.dataUrl) fullBytes = await fetchDocBytes(result.dataUrl)
       if (!doc.filePath) pathlessDocSavedPath = savedPath
     } else {
-      const result = await window.desktop.saveDocx(savedPath, buffer, auto)
+      const result = await getOfficeHost().saveDocx(savedPath, buffer, auto)
       if (!result.ok) {
         // external-modified: the main process already prompted (or the autosave
         // deferred to a manual save) — stay dirty, no second dialog/error banner
@@ -1252,7 +1253,7 @@ async function printGroupsMerged(
         page.classList.toggle('pv-print-skip', i < g.from || i > g.to)
         page.classList.toggle('pv-print-tail', i === g.to)
       })
-      const part = await window.desktop.printPdfBuffer(g.w, g.h, scale)
+      const part = await getOfficeHost().printPdfBuffer(g.w, g.h, scale)
       if (part.ok && part.base64) {
         parts.push(part.base64)
         continue
@@ -1271,7 +1272,7 @@ async function printGroupsMerged(
     appRoot?.classList.remove('pv-exporting')
     pvPages.forEach((page) => page.classList.remove('pv-print-skip', 'pv-print-tail'))
   }
-  const result = await window.desktop.saveMergedPdf(fileName, parts, outPath)
+  const result = await getOfficeHost().saveMergedPdf(fileName, parts, outPath)
   const mixed = groups.some((g) => g.w !== groups[0].w || g.h !== groups[0].h)
   ctx.setStatus(
     result.ok
@@ -1342,7 +1343,7 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
       // preview open but uniform paper: single export at the preview size
       const g = groups[0]
       if (g) {
-        const result = await window.desktop.exportPdf(doc.fileName, g.w, g.h, outPath, scale)
+        const result = await getOfficeHost().exportPdf(doc.fileName, g.w, g.h, outPath, scale)
         if (result.ok) {
           ctx.setStatus(t('appExportedPdf', { path: result.path ?? '' }))
           return true
@@ -1408,7 +1409,7 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
       return deferExportToPreview(ctx, outPath)
     }
     const major = [...counts.values()][0]
-    const result = await window.desktop.exportPdf(
+    const result = await getOfficeHost().exportPdf(
       doc.fileName,
       major?.w ?? ctx.section?.pageWidth ?? 12240,
       major?.h ?? ctx.section?.pageHeight ?? 15840,
@@ -1440,7 +1441,7 @@ const IMAGE_EXPORT_DPI = 192
 export async function exportImages(ctx: FileActionContext): Promise<boolean> {
   const { doc } = ctx
   if (!doc) return false
-  const target = await window.desktop.pickExportImagesTarget()
+  const target = await getOfficeHost().pickExportImagesTarget()
   if (!target) return false
   ctx.setStatus(t('appExportingImages'))
   const fail = (error: string) => {
@@ -1464,10 +1465,10 @@ export async function exportImages(ctx: FileActionContext): Promise<boolean> {
     },
   }
   if (!(await exportPdf(staged, target.pdfPath))) {
-    void window.desktop.takeExportPdf(target.pdfPath)
+    void getOfficeHost().takeExportPdf(target.pdfPath)
     return false
   }
-  const pdf = await window.desktop.takeExportPdf(target.pdfPath)
+  const pdf = await getOfficeHost().takeExportPdf(target.pdfPath)
   if (!pdf.ok || !pdf.base64) return fail(pdf.error ?? '')
   const baseName = doc.fileName.replace(/\.docx$/i, '')
   try {
@@ -1497,7 +1498,7 @@ export async function exportImages(ctx: FileActionContext): Promise<boolean> {
         for (let o = 0; o < u8.length; o += 0x8000) {
           b64 += String.fromCharCode(...u8.subarray(o, o + 0x8000))
         }
-        const r = await window.desktop.writeExportImage(
+        const r = await getOfficeHost().writeExportImage(
           target.dir,
           `${baseName}-${String(i).padStart(pad, '0')}.png`,
           btoa(b64),
@@ -1529,7 +1530,7 @@ export async function exportHtml(ctx: FileActionContext, outPath?: string): Prom
     lang: getLang(),
     textWidthPx: Number.isFinite(textWidthPx) ? textWidthPx : root.clientWidth,
   })
-  const result = await window.desktop.exportHtml(doc.fileName, html, outPath)
+  const result = await getOfficeHost().exportHtml(doc.fileName, html, outPath)
   ctx.setStatus(
     result.ok
       ? t('appExportedHtml', { path: result.path ?? '' })
