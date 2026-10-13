@@ -154,3 +154,26 @@ Sheets complete-tool and format sample checkpoint (2026-10-14):
 - Parent evidence retains 55 valid operation receipts, real-model browser turns,
   negative/unknown outcomes, downloaded hashes and a multi-feature OOXML sample.
   Actual Excel/WPS reopen and full format compatibility remain pending.
+
+Slides native document host checkpoint (2026-10-14):
+
+- Move the original session snapshots, history, media resolution and render
+  rebuilds into session-document.ts. Explicit host callbacks supply metrics and
+  notifications; session-state.ts remains the Electron host of that same core.
+- Move the original transaction funnel, native planning, op journal, autofit
+  resize and fontScale post-pass into document-operations.ts. Desktop IPC and
+  shell MCP still call these functions; no alternate editor or OOXML writer.
+- Add a Node PresentationRuntime around the same engine for blank/open, native
+  transactions, revision checks, undo/redo, private serialization and exact
+  publication acknowledgement. Failed publication keeps the document dirty.
+- The bundle loads all 72 upstream operation registrations. This does not mean
+  all 72 operations or the Web UI have been accepted. Linux smoke evidence
+  covers text, shape, notes, two slides, immutable input, native save/reopen and
+  byte-identical untouched theme/master/layout parts. Smoke tests use upstream
+  heuristic metrics; production original font-host wiring remains pending.
+- Slides typecheck and 26 targeted tests pass. Full browser-independent suite:
+  134 files / 1419 tests pass, 1 file / 14 tests skipped; the desktop printing
+  suite lacks an Electron binary and is excluded, not counted as accepted.
+- Next: authenticated existing-environment service, full native renderer's
+  OfficeHost/iframe connection, normal cloud save/close and current-draft Agent.
+  The parent deliberately leaves PPTX UI disabled until these paths work.
