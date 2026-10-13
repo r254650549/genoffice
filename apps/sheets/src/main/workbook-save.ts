@@ -289,5 +289,3 @@ export async function writeWorkbookTo(
   })
   return mutation
 }
-
-
