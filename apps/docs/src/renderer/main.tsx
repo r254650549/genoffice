@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import { htmlDir, htmlLang, type Lang } from '@genoffice/i18n'
 import { App } from './App'
 import { LocaleProvider, setModuleLang } from './i18n/locale'
+import { configureOfficeHost } from './office-host'
 import type { DocTheme, UiTheme } from '../shared/ipc'
 import '@genoffice/ui/tokens.css'
 import '@genoffice/ui/screentip.css'
@@ -37,6 +38,13 @@ function applyDocumentTheme(theme: DocTheme): void {
 }
 
 async function bootstrap(): Promise<void> {
+  if (window.desktop) {
+    configureOfficeHost({
+      copyImageToClipboard: (dataUrl, metadata) =>
+        window.desktop.copyImageToClipboard(dataUrl, metadata),
+      onLanguageChanged: (listener) => window.desktop.onLanguageChanged(listener),
+    })
+  }
   let lang: Lang = 'zh'
   let theme: UiTheme = 'system'
   let docTheme: DocTheme = 'follow'

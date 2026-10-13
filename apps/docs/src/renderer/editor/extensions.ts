@@ -1,4 +1,5 @@
 import { ScriptFonts } from './script-fonts'
+import { getOfficeHost } from '../office-host'
 import { Editor, Extension, Node } from '@tiptap/core'
 import { SHAPE_INLINE_WRAP } from './floating-z-order'
 import { StreamingTailGuardExtension } from './streaming-tail-guard'
@@ -4063,7 +4064,7 @@ export const ImageCopyExtension = Extension.create({
           return false
         }
       }
-      const write = window.desktop?.copyImageToClipboard?.(dataUrl, imageMetaJson(node.attrs))
+      const write = getOfficeHost()?.copyImageToClipboard?.(dataUrl, imageMetaJson(node.attrs))
       // no bridge: keep the default HTML-only copy instead of an empty clipboard
       if (!write) return false
       event.preventDefault()
