@@ -64,3 +64,21 @@ DOCX tool closure (2026-10-13):
 - Native bridge, comments, revisions, charts and style/floating tests: 46 pass.
   Parent evidence includes real-model edits, native undo/redo, cloud save/reopen,
   tracked-change accept/reject and DOCX XML round-trip checks.
+
+XLSX runtime extraction (2026-10-13, Web integration still pending):
+
+- Move `writeWorkbookTo` unchanged out of `sheets-main.ts` into
+  `workbook-save.ts`. Electron imports this same function; there is no second
+  spreadsheet writer or snapshot-to-XLSX replacement.
+- `WorkbookRuntime` owns native sidecar sessions and immutable input snapshots,
+  validates range/recalc/save/chunk requests with the existing schemas, and
+  uses the original Rust sidecar and OOXML gateway. A prepared save opens a new
+  snapshot and keeps the previous session intact until the outer host confirms
+  publication. The outer host must enforce user/browser ownership and release
+  sessions; this module is not a public network service.
+- Rust 1.95.0, Cargo.lock, Node 24 and the source fork are fixed by the parent
+  build script. The runtime bundle excludes Electron and enterprise code.
+- A real Linux-container integration test covers native blank workbook creation,
+  ranges, formulas, formatting, multiple sheets, immutable save, reopen, range
+  limits, expired sessions and untouched OOXML parts. It does not constitute
+  browser, Agent or user-execution-environment acceptance.
