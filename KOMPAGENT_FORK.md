@@ -45,3 +45,22 @@ upstream commit into this branch, resolve host-adapter conflicts, run the DOCX
 round-trip/browser checks, commit here, then update the parent submodule pointer.
 Do not change the parent pointer before the adapted child commit is available
 from its configured origin.
+
+DOCX tool closure (2026-10-13):
+
+- The current-document bridge exposes the 30 native editing/read tools plus
+  discovery, save, undo and redo. Tool schemas and all 23 batch operation
+  signatures come directly from the upstream definitions.
+- `mcp-document-tools.ts` passes App-owned comments, notes, page setup,
+  headers/footers, styles, watermark and protection contexts to `executeTool`.
+  Frozen selection tokens prevent cursor movement from retargeting edits.
+- Command execution and autosave coordinate through the explicit OfficeHost;
+  snapshot publication completes before the next queued command is handled.
+- Image insertion also accepts native data URLs. KompAgent can resolve a
+  permission-checked immutable cloud image into this format.
+- Native undo does not roll back every separate document metadata store. The
+  tool catalog states that boundary. The second-agent writer, search, media
+  services and cross-format creation are not exposed by this document bridge.
+- Native bridge, comments, revisions, charts and style/floating tests: 46 pass.
+  Parent evidence includes real-model edits, native undo/redo, cloud save/reopen,
+  tracked-change accept/reject and DOCX XML round-trip checks.

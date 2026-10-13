@@ -417,6 +417,7 @@ const WORD_COUNT_THROTTLE_MS = 400
 const MAX_FOLLOW_UP_PASSES = 6
 import { runHeadlessDocumentExport } from './headless-export'
 import { installMcpBridge } from './mcp-bridge'
+import type { McpAccess } from './mcp-document-tools'
 import {
   clampDocsZoom,
   DOCS_ZOOM_MAX,
@@ -1870,16 +1871,17 @@ export function App() {
   useEffect(() => {
     if (tornDown) return
     const timer = window.setInterval(() => {
-      void writeRecoveryCopyImpl(fileCtxRef.current)
+      if (!getOfficeHost().commandInFlight) void writeRecoveryCopyImpl(fileCtxRef.current)
     }, 30_000)
     return () => window.clearInterval(timer)
   }, [tornDown])
 
+  const mcpAccessRef = useRef<McpAccess>({})
   // MCP bridge: let an external agent drive this visible editor. Commands arrive
   // from the shell main process and run against the live ctx (refs refresh per render).
   useEffect(() => {
     if (tornDown || !editor) return
-    return installMcpBridge({ getCtx: () => fileCtxRef.current })
+    return installMcpBridge({ getCtx: () => fileCtxRef.current, getAccess: () => mcpAccessRef.current })
   }, [tornDown, editor])
 
   // Recompute the document-level line-height factor while editing:
@@ -5229,6 +5231,7 @@ export function App() {
   useEffect(() => {
     if (tornDown || !autoSave || !doc || !doc.filePath) return
     const tick = () => {
+      if (getOfficeHost().commandInFlight) return
       if (!isDocDirty(fileCtxRef.current)) return
       if (editor?.view.composing) return // don't interrupt IME input
       const active = document.activeElement as HTMLElement | null
@@ -6552,6 +6555,8 @@ export function App() {
     }),
     [editor],
   )
+
+  mcpAccessRef.current = {comments:aiCommentsAccess,hf:aiHfAccess,pageSetup:aiPageSetupAccess,extras:aiDocExtras,notes:aiNotesAccess,locked:isProtected || readMode,commentsAllowed:!readMode && (!isProtected || commentsAllowed),track:trackChanges ? {author:AI_REVISION_AUTHOR} : undefined}
 
   const ribbonActions = useStableCallbacks({
     allocateNumId: (kind: 'bullet' | 'ordered') => allocateListNumId(kind),

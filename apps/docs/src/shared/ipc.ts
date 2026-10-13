@@ -259,8 +259,7 @@ export interface ZoteroRendererResponse {
  * reuse the built-in agent's tool executors; `save_document` writes the live
  * document to an explicit path.
  */
-export type McpEditorCommand =
-  'insert_content' | 'replace_blocks' | 'apply_ops' | 'read_document' | 'save_document'
+export type McpEditorCommand = import('./document-commands').DocumentCommand
 
 export interface McpCommandMessage {
   requestId: string

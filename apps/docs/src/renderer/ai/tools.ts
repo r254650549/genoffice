@@ -946,7 +946,7 @@ async function executeAsyncTool(
       return insertPicture(editor, call, signal)
     case 'insert_image': {
       const url = String(call.input.url ?? '')
-      if (!/^https?:\/\//.test(url)) return fail(t('aiSumInsertImage'), 'invalid url')
+      if (!/^https?:\/\/|^data:image\//.test(url)) return fail(t('aiSumInsertImage'), 'invalid image url')
       return insertImageFromUrl(editor, url, Number(call.input.maxWidthPx) || 480, signal, {
         failLabel: t('aiSumInsertImage'),
         doneLabel: t('aiSumInsertWebImage'),
@@ -1135,7 +1135,7 @@ async function insertImageFromUrl(
   signal: AbortSignal | undefined,
   labels: { failLabel: string; doneLabel: string; blockLabel: string },
 ): Promise<ToolExecution> {
-  const fetched = await getOfficeHost().fetchImage(url)
+  const fetched = url.startsWith('data:') ? {base64:url.slice(url.indexOf(',')+1)} : await getOfficeHost().fetchImage(url)
   // never write after the user hit stop (the download may resolve long after the abort)
   if (signal?.aborted)
     return fail(labels.failLabel, 'stopped by the user; the image was not inserted')

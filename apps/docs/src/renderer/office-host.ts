@@ -3,6 +3,7 @@ import type { DesktopApi, McpCommandMessage } from '../shared/ipc'
 export interface OfficeHost extends DesktopApi {
   kind?: 'electron' | 'web'
   readOnly?: boolean
+  commandInFlight?: boolean
   documentStateChanged?(values: readonly unknown[], saving: boolean): void
   openAgent?(prompt?: string): void
   bindDocument?(snapshot: () => Promise<Uint8Array | null>, subscribe: (listener: () => void) => () => void): void

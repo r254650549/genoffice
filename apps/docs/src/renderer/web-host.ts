@@ -13,6 +13,7 @@ let publishing: Promise<void> = Promise.resolve()
 let draftRetry: ReturnType<typeof setTimeout> | undefined
 let retryDelay = 1000
 let tornDown = false
+let commandInFlight = false
 const origin = window.location.origin
 function notify(method: string, args: unknown[]): void {
   window.parent.postMessage({ channel, kind: 'notify', id: crypto.randomUUID(), method, args, revision }, origin)
@@ -79,6 +80,7 @@ revision = session.revision
 publishedRevision = session.hasContent ? session.revision : -1
 const host: OfficeHost = {
   kind: 'web',
+  get commandInFlight() {return commandInFlight},
   readOnly: session.readOnly,
   documentStateChanged: (values, saving) => {const previous=externalState;externalState=values;if(!snapshot||saving||!previous||values.every((value,index)=>Object.is(value,previous[index])))return;revision++;if(draftTimer)clearTimeout(draftTimer);draftTimer=setTimeout(()=>{void flushDraft().catch(error=>notify('draftError',[String(error)]))},750)},
   getLanguage: (...args) => call('getLanguage', args),
@@ -186,11 +188,12 @@ const host: OfficeHost = {
   beforeMcpCommand: (message: McpCommandMessage) => {
     const expected = (message as McpCommandMessage & {expectedRevision?: number}).expectedRevision
     if (expected !== undefined && expected !== revision) throw new Error('OFFICE_REVISION_CONFLICT: read_document again before editing')
+    commandInFlight = true
     document.body.inert = true
   },
   reportMcpResult: (result: McpCommandResult) => {
     const captured=revision
-    void flushDraft().then(() => request('reportMcpResult', [{...result, revision:captured}])).catch(error => notify('draftError', [String(error)])).finally(() => {document.body.inert=false})
+    return flushDraft().then(() => request('reportMcpResult', [{...result, revision:captured}])).catch(error => notify('draftError', [String(error)])).finally(() => {commandInFlight=false;document.body.inert=false})
   },
   signalMcpReady: () => {notify('ready', [revision]);void flushDraft().catch(error => notify('draftError', [String(error)]))},
 }
