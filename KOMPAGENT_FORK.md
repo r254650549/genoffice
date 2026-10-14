@@ -5,6 +5,13 @@ Origin: https://github.com/r254650549/genoffice.git
 Baseline: `fc754f7a90619289942602ebcce68bd57a90515c`.
 Branch: `codex/kompagent-office-host`.
 
+2026-10-14 DOCX Web recovery correction: the native desktop recovery timer and
+post-AI first-save handler are not installed in the Web host. The existing Web
+revision bridge keeps new content temporary and persists existing-file drafts;
+only an explicit Save publishes a file
+to Drive. This avoids an unsolicited first-save name prompt every 30 seconds
+and keeps desktop recovery behavior unchanged.
+
 This repository retains the complete upstream Git history. KompAgent includes
 it as a Git submodule and pins an adapted commit, rather than copying source
 files or changing them during a build. Original licenses and notices remain.

@@ -1869,7 +1869,9 @@ export function App() {
   // copy to the main process every 30s; a normal save (or discarding on close) removes
   // it, and reopening the file offers Restore/Discard when a newer copy exists.
   useEffect(() => {
-    if (tornDown) return
+    // The Web host persists revisioned private drafts. Desktop recovery's
+    // pathless save would publish to Drive and prompt for a name every 30s.
+    if (tornDown || getOfficeHost().kind === 'web') return
     const timer = window.setInterval(() => {
       if (!getOfficeHost().commandInFlight) void writeRecoveryCopyImpl(fileCtxRef.current)
     }, 30_000)
@@ -5251,6 +5253,7 @@ export function App() {
   // in file-actions), which also renames the shell tab — mirrors slides, where AI
   // generation names and persists the draft deck.
   useEffect(() => {
+    if (getOfficeHost().kind === 'web') return
     const handler = () => {
       const cur = fileCtxRef.current
       if (!cur.doc || cur.doc.filePath || !anyDirtyRef.current) return
