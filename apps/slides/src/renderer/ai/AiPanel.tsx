@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './../office-host'
 import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
@@ -371,11 +372,17 @@ function clampPanelWidth(w: number): number {
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
-  getSettings: () => window.slidesApi.getAiSettings(),
-  setSettings: (settings) => window.slidesApi.setAiSettings(settings),
-  onSettingsChanged: (handler) => window.slidesApi.onAiSettingsChanged(handler),
-  gskLoggedIn: () => window.slidesApi.aiGskStatus().then((s) => !!s?.loggedIn),
-  openModelSettings: () => window.slidesApi.openAiModelSettings().catch(() => {}),
+  getSettings: () => getOfficeHost().getAiSettings(),
+  setSettings: (settings) => getOfficeHost().setAiSettings(settings),
+  onSettingsChanged: (handler) => getOfficeHost().onAiSettingsChanged(handler),
+  gskLoggedIn: () =>
+    getOfficeHost()
+      .aiGskStatus()
+      .then((s) => !!s?.loggedIn),
+  openModelSettings: () =>
+    getOfficeHost()
+      .openAiModelSettings()
+      .catch(() => {}),
 }
 
 export function AiPanel({
@@ -550,7 +557,7 @@ export function AiPanel({
   useEffect(() => {
     let alive = true
     const refresh = () => {
-      void window.slidesApi
+      void getOfficeHost()
         ?.aiGskStatus()
         .then((s) => {
           if (alive) gskLoggedInRef.current = !!s?.loggedIn
@@ -712,7 +719,7 @@ export function AiPanel({
    * it there would feed it straight back on the next reopen.
    */
   const logRunFailure = (kind: 'error' | 'stopped', error?: string) => {
-    void window.slidesApi
+    void getOfficeHost()
       .aiLogRunFailure({
         kind,
         instruction: instructionRef.current,
@@ -787,14 +794,14 @@ export function AiPanel({
   const finishHistoryBatch = async () => {
     if (!historyBatchActiveRef.current) return
     historyBatchActiveRef.current = false
-    const id = await window.slidesApi.endHistoryBatch()
+    const id = await getOfficeHost().endHistoryBatch()
     if (typeof id !== 'number') return
     runSnapshotIdRef.current = id
     patchLastAssistant({ snapshotId: id })
   }
 
   const rollback = async (snapshotId: number) => {
-    const restored = await window.slidesApi.aiSnapshotRestore(snapshotId)
+    const restored = await getOfficeHost().aiSnapshotRestore(snapshotId)
     if (!restored) {
       // Evicted from the main-process snapshot ring — retire the dead action
       setChat((prev) =>
@@ -861,7 +868,7 @@ export function AiPanel({
           signal?.removeEventListener('abort', onAbort)
           unsub()
           // On timeout/abort the main-process stream keeps running; it must be cancelled explicitly or orphan streams eat proxy concurrency
-          if (cancelUpstream) void window.slidesApi.aiStreamCancel(requestId)
+          if (cancelUpstream) void getOfficeHost().aiStreamCancel(requestId)
           resolve(r)
         }
         const onAbort = () =>
@@ -886,7 +893,7 @@ export function AiPanel({
           )
         }
         armTimeout()
-        const unsub = window.slidesApi.onAiStream((chunk) => {
+        const unsub = getOfficeHost().onAiStream((chunk) => {
           if (chunk.requestId !== requestId) return
           armTimeout() // any chunk (including pings) proves the turn is alive
           if (chunk.type === 'delta') buf += chunk.text ?? ''
@@ -908,7 +915,7 @@ export function AiPanel({
         })
         signal?.addEventListener('abort', onAbort, { once: true })
         // If invoke itself rejects (IPC-layer failure), fail immediately instead of waiting out the timeout
-        window.slidesApi
+        getOfficeHost()
           .aiStream({
             requestId,
             settings,
@@ -965,7 +972,7 @@ export function AiPanel({
         insertAt?: number,
       ) => {
         try {
-          const res = await window.slidesApi.landGeneratedPages(
+          const res = await getOfficeHost().landGeneratedPages(
             pageMarkers,
             fitWidthPx,
             mode,
@@ -1017,7 +1024,7 @@ export function AiPanel({
       },
       regenerateSlide: async (slideIndex: number, marker: string) => {
         try {
-          const res = await window.slidesApi.landGeneratedPages(
+          const res = await getOfficeHost().landGeneratedPages(
             [marker],
             fitWidthPx,
             'replace_at',
@@ -1065,7 +1072,7 @@ export function AiPanel({
         const cur = settingsRef.current
         if (!cloudToolsEnabled(cur)) return false
         try {
-          return !!(await window.slidesApi.cloudGenStatus())?.enabled
+          return !!(await getOfficeHost().cloudGenStatus())?.enabled
         } catch {
           return false
         }
@@ -1139,7 +1146,7 @@ export function AiPanel({
             continue
           }
           try {
-            const res = await window.slidesApi.localGeneratePage({ specJson: r.text })
+            const res = await getOfficeHost().localGeneratePage({ specJson: r.text })
             if (res?.ok && res.marker) return res
             lastErr = res?.error ?? tGlobal('aiErrUnknown')
           } catch (e) {
@@ -1155,7 +1162,10 @@ export function AiPanel({
         if (args.signal?.aborted) return { ok: false, error: tGlobal('aiErrStopped') }
         // Forward the panel's stop signal: the main process aborts the in-flight
         // cloud request instead of letting it run (and bill) to completion
-        const cancelCloud = () => void window.slidesApi.cloudPageCancel().catch(() => {})
+        const cancelCloud = () =>
+          void getOfficeHost()
+            .cloudPageCancel()
+            .catch(() => {})
         args.signal?.addEventListener('abort', cancelCloud, { once: true })
         try {
           const briefParts = [args.brief]
@@ -1167,7 +1177,7 @@ export function AiPanel({
           // The cloud service owns its own page prompt; the template chrome rides
           // in as part of the style so its pages pin the same geometry
           const styleSkill = args.skeleton ? `${args.style}\n\n${args.skeleton}` : args.style
-          const res = await window.slidesApi.cloudGeneratePage({
+          const res = await getOfficeHost().cloudGeneratePage({
             brief: briefParts.join('\n\n'),
             title: args.title,
             styleSkill,
@@ -1341,7 +1351,7 @@ export function AiPanel({
       },
       searchImages: async (query: string, maxResults: number) => {
         try {
-          const r = await window.slidesApi.imageSearch(query, maxResults)
+          const r = await getOfficeHost().imageSearch(query, maxResults)
           return r.images.map((im) => im.imageUrl).filter(Boolean)
         } catch {
           return []
@@ -1349,28 +1359,28 @@ export function AiPanel({
       },
       saveSidecar: async (data) => {
         try {
-          await window.slidesApi.saveStyleSidecar(data)
+          await getOfficeHost().saveStyleSidecar(data)
         } catch {
           /* fail-open */
         }
       },
       saveStyleTemplate: async (name, data) => {
         try {
-          return await window.slidesApi.saveStyleTemplate(name, data)
+          return await getOfficeHost().saveStyleTemplate(name, data)
         } catch {
           return { ok: false, error: String('') }
         }
       },
       listStyleTemplates: async () => {
         try {
-          return await window.slidesApi.listStyleTemplates()
+          return await getOfficeHost().listStyleTemplates()
         } catch {
           return []
         }
       },
       loadStyleTemplate: async (name) => {
         try {
-          return await window.slidesApi.loadStyleTemplate(name)
+          return await getOfficeHost().loadStyleTemplate(name)
         } catch {
           return { ok: false, error: String('') }
         }
@@ -1539,7 +1549,7 @@ export function AiPanel({
           // gsk status rather than matching the localized error text — but only
           // when Genspark is the provider: a BYOK user's error (e.g. their own
           // provider's rate limit) must not advertise a Genspark sign-in (#1948)
-          void window.slidesApi
+          void getOfficeHost()
             .aiGskStatus()
             .then((status) => {
               if (status.loggedIn) return
@@ -1783,7 +1793,7 @@ export function AiPanel({
         // Clear the flag before run: loop.run sets running synchronously, leaving no re-entry window
         runStartingRef.current = false
         await onBeforeRunRef.current?.()
-        if (await window.slidesApi.beginHistoryBatch()) historyBatchActiveRef.current = true
+        if (await getOfficeHost().beginHistoryBatch()) historyBatchActiveRef.current = true
         loop.run(modelInstruction, images)
       })
       .catch(() => {
@@ -1820,7 +1830,7 @@ export function AiPanel({
       setBusy(true)
       queueRunResolverRef.current = resolve
       void Promise.resolve(onBeforeRunRef.current?.())
-        .then(() => window.slidesApi.beginHistoryBatch())
+        .then(() => getOfficeHost().beginHistoryBatch())
         .then((ok) => {
           if (ok) historyBatchActiveRef.current = true
           runStartingRef.current = false
@@ -1938,7 +1948,7 @@ export function AiPanel({
           if (slidesRef.current[page]) lines.push(tGlobal('aiQcPageSkipped', { n: page + 1 }))
           continue
         }
-        const batchOpened = await window.slidesApi.beginHistoryBatch()
+        const batchOpened = await getOfficeHost().beginHistoryBatch()
         let result = await qcSlidePage({
           access,
           transport,
@@ -1958,7 +1968,7 @@ export function AiPanel({
             signal: controller.signal,
           })
         }
-        const batchId = batchOpened ? await window.slidesApi.endHistoryBatch() : null
+        const batchId = batchOpened ? await getOfficeHost().endHistoryBatch() : null
         if (controller.signal.aborted) break
         if (result.error) {
           // QC is optional polish. Keep provider/network details in diagnostics instead of
@@ -1968,7 +1978,7 @@ export function AiPanel({
         } else if (result.edited && result.postIssues > result.preIssues) {
           // The fix made the deterministic audit worse — undo this page's batch
           if (typeof batchId === 'number') {
-            const restored = await window.slidesApi.aiSnapshotRestore(batchId)
+            const restored = await getOfficeHost().aiSnapshotRestore(batchId)
             if (restored)
               applyDeckRef.current(restored, Math.min(currentRef.current, restored.length - 1))
           }
@@ -2184,7 +2194,7 @@ export function AiPanel({
         <div className="ai-panel-header-actions">
           <AiPanelSideButton
             lang={lang}
-            onMove={(side) => window.slidesApi.setAiPanelPrefs({ side })}
+            onMove={(side) => getOfficeHost().setAiPanelPrefs({ side })}
           />
           {(chat.length > 0 || historicChat.length > 0) && (
             <button
@@ -2309,7 +2319,7 @@ export function AiPanel({
                 <div className="ai-msg-error">{t('aiMsgError', { error: entry.error })}</div>
               )}
               {entry.loginRequired && (
-                <button className="ai-login-btn" onClick={() => void window.slidesApi.aiGskLogin()}>
+                <button className="ai-login-btn" onClick={() => void getOfficeHost().aiGskLogin()}>
                   {t('aiGskLoginBtn')}
                 </button>
               )}

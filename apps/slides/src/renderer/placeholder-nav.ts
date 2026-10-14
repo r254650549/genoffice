@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * PowerPoint for Windows: Ctrl+Enter while editing commits the text and moves the
  * caret into the next placeholder in spTree order; past the last one it inserts a
@@ -33,13 +34,13 @@ export async function nextPlaceholder(
   const { editing, slide, current } = ctx
   if (!editing || !slide) return
   if (editing.discardIfEmpty && (!paragraphs || paragraphsBlank(paragraphs))) {
-    const updated = await window.slidesApi.deleteElement({
+    const updated = await getOfficeHost().deleteElement({
       slideIndex: current,
       sourceId: editing.sourceId,
     })
     if (updated) ctx.applySlide(current, updated)
   } else if (paragraphs) {
-    const updated = await window.slidesApi.editText({
+    const updated = await getOfficeHost().editText({
       slideIndex: current,
       sourceId: editing.sourceId,
       paragraphs,
@@ -53,7 +54,7 @@ export async function nextPlaceholder(
     ctx.setEditing({ sourceId: next })
     return
   }
-  const r = await window.slidesApi.addBlankSlide({ sourceIndex: current, fitWidthPx: FIT_WIDTH })
+  const r = await getOfficeHost().addBlankSlide({ sourceIndex: current, fitWidthPx: FIT_WIDTH })
   if (!r) {
     ctx.setEditing(null)
     ctx.setSelectedIds([editing.sourceId])

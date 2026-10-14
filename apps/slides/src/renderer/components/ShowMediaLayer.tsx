@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './../office-host'
 /**
  * Audio/video layer during a show: DOM players stacked over video/audio nodes.
  * In the editor media only has poster frames; a show must be able to play, or decks
@@ -46,9 +47,11 @@ export function ShowMediaLayer({
     setUrls({})
     setPlaying({})
     for (const n of nodes) {
-      void window.slidesApi.getMediaData(slideIndex, n.sourceId).then((d) => {
-        if (!cancelled && d) setUrls((u) => ({ ...u, [n.sourceId]: d }))
-      })
+      void getOfficeHost()
+        .getMediaData(slideIndex, n.sourceId)
+        .then((d) => {
+          if (!cancelled && d) setUrls((u) => ({ ...u, [n.sourceId]: d }))
+        })
     }
     return () => {
       cancelled = true

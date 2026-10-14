@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Clipboard and format-painter actions extracted from App.tsx:
  * element copy/cut/paste/duplicate, slide copy/paste, external clipboard
@@ -18,7 +19,7 @@ import { t } from './i18n/locale'
 
 export async function deleteSelected(ctx: ActionCtx): Promise<void> {
   if (ctx.selectedIds.length) {
-    const updated = await window.slidesApi.deleteElements({
+    const updated = await getOfficeHost().deleteElements({
       slideIndex: ctx.current,
       sourceIds: ctx.selectedIds,
     })
@@ -31,7 +32,7 @@ export async function copySelected(ctx: ActionCtx): Promise<void> {
   if (ctx.selectedIds.length === 0) return
   const clipboardToken = crypto.randomUUID()
   const sourceIds = [...ctx.selectedIds]
-  const n = await window.slidesApi.copyElements({
+  const n = await getOfficeHost().copyElements({
     slideIndex: ctx.current,
     sourceIds,
     clipboardToken,
@@ -42,7 +43,7 @@ export async function copySelected(ctx: ActionCtx): Promise<void> {
     if (ctx.slide) {
       try {
         const png = await renderSelectionToPngBase64(ctx.slide, sourceIds, ctx.images)
-        await window.slidesApi.copyElementsImage(clipboardToken, png)
+        await getOfficeHost().copyElementsImage(clipboardToken, png)
       } catch {
         // The editable copy is already available if rendering or image decoding fails.
       }
@@ -52,7 +53,7 @@ export async function copySelected(ctx: ActionCtx): Promise<void> {
 
 export async function cutSelected(ctx: ActionCtx): Promise<void> {
   if (ctx.selectedIds.length === 0) return
-  const n = await window.slidesApi.copyElements({
+  const n = await getOfficeHost().copyElements({
     slideIndex: ctx.current,
     sourceIds: ctx.selectedIds,
     cut: true,
@@ -77,7 +78,7 @@ export async function insertExternalImage(
     img.onerror = () => resolve({ width: 320, height: 240 })
     img.src = `data:image/${ext};base64,${base64}`
   })
-  const r = await window.slidesApi.addImageBytes({
+  const r = await getOfficeHost().addImageBytes({
     slideIndex: ctx.current,
     base64,
     ext,
@@ -109,7 +110,7 @@ export async function copySlides(ctx: ActionCtx, indexes: number[]): Promise<voi
   } catch {
     pngs = undefined
   }
-  const ok = await window.slidesApi.copySlides({ slideIndexes: sel, ...(pngs ? { pngs } : {}) })
+  const ok = await getOfficeHost().copySlides({ slideIndexes: sel, ...(pngs ? { pngs } : {}) })
   ctx.setCanPasteSlide(ok)
   ctx.setStatus(ok ? t('appStatusSlideCopied') : t('appStatusSlideCopyFailed'))
 }
@@ -129,7 +130,7 @@ export async function pasteSlideAfter(
   index: number,
   mode: PasteSlideMode = 'theme',
 ): Promise<void> {
-  const r = await window.slidesApi.pasteSlide({ afterIndex: index, fitWidthPx: FIT_WIDTH, mode })
+  const r = await getOfficeHost().pasteSlide({ afterIndex: index, fitWidthPx: FIT_WIDTH, mode })
   if (!r) {
     ctx.setStatus(t('appStatusSlidePasteFailed'))
     return
@@ -140,7 +141,7 @@ export async function pasteSlideAfter(
 /** Paste-options floater: redo the just-completed paste with another mode. */
 export async function repasteSlideAs(ctx: ActionCtx, mode: PasteSlideMode): Promise<void> {
   if (ctx.pasteFloater?.mode === mode) return
-  const r = await window.slidesApi.repasteSlide({ mode, fitWidthPx: FIT_WIDTH })
+  const r = await getOfficeHost().repasteSlide({ mode, fitWidthPx: FIT_WIDTH })
   if (!r) {
     ctx.setPasteFloater(null)
     ctx.setStatus(t('appStatusPasteOptionsExpired'))
@@ -173,7 +174,7 @@ export function pasteParagraphs(text: string): {
 }
 
 export async function pasteClipboard(ctx: ActionCtx): Promise<void> {
-  const external = await window.slidesApi.clipboardExternal()
+  const external = await getOfficeHost().clipboardExternal()
   if (external.kind === 'slide') {
     await pasteSlideAfter(ctx, Math.max(...ctx.selectedSlides, ctx.current))
     return
@@ -185,7 +186,7 @@ export async function pasteClipboard(ctx: ActionCtx): Promise<void> {
   if (external.kind === 'text') {
     const w = 400
     const { paragraphs, truncated } = pasteParagraphs(external.text)
-    const r = await window.slidesApi.addElement({
+    const r = await getOfficeHost().addElement({
       slideIndex: ctx.current,
       kind: 'textbox',
       xPx: ((ctx.slide?.widthPx ?? FIT_WIDTH) - w) / 2,
@@ -202,7 +203,7 @@ export async function pasteClipboard(ctx: ActionCtx): Promise<void> {
     }
     return
   }
-  const r = await window.slidesApi.pasteElements({ slideIndex: ctx.current, fitWidthPx: FIT_WIDTH })
+  const r = await getOfficeHost().pasteElements({ slideIndex: ctx.current, fitWidthPx: FIT_WIDTH })
   if (r) {
     ctx.applySlide(ctx.current, r.slide)
     ctx.setSelectedIds(r.sourceIds)
@@ -218,7 +219,7 @@ export async function duplicateSelected(
   dyPx = 16,
 ): Promise<void> {
   if (!ids.length) return
-  const r = await window.slidesApi.duplicateElements({
+  const r = await getOfficeHost().duplicateElements({
     slideIndex: ctx.current,
     sourceIds: ids,
     dxPx,
@@ -254,7 +255,7 @@ export async function pasteFormat(ctx: ActionCtx): Promise<void> {
     const plan = computeBrushApply(ctx.brushFormat, node)
     // Apply fill
     if (plan.fillColor !== undefined) {
-      await window.slidesApi.editFill({
+      await getOfficeHost().editFill({
         slideIndex: ctx.current,
         sourceId: id,
         fill: plan.fillColor,
@@ -262,7 +263,7 @@ export async function pasteFormat(ctx: ActionCtx): Promise<void> {
     }
     // Apply stroke
     if (plan.stroke !== undefined) {
-      await window.slidesApi.editStroke({
+      await getOfficeHost().editStroke({
         slideIndex: ctx.current,
         sourceId: id,
         stroke: plan.stroke,
@@ -272,7 +273,7 @@ export async function pasteFormat(ctx: ActionCtx): Promise<void> {
     if ((plan.runFormat || plan.align) && (node.type === 'shape' || node.type === 'text')) {
       const paras = buildEditParagraphsWithFormat(node, plan.runFormat, plan.align)
       if (paras) {
-        const updated = await window.slidesApi.editText({
+        const updated = await getOfficeHost().editText({
           slideIndex: ctx.current,
           sourceId: id,
           paragraphs: paras,
@@ -281,7 +282,7 @@ export async function pasteFormat(ctx: ActionCtx): Promise<void> {
       }
     } else if (plan.fillColor !== undefined || plan.stroke !== undefined) {
       // fill/stroke were applied; re-render to get the latest page
-      const updated = await window.slidesApi.editFill({
+      const updated = await getOfficeHost().editFill({
         slideIndex: ctx.current,
         sourceId: id,
         fill: plan.fillColor ?? 'none',
@@ -326,7 +327,7 @@ export async function applyBrushToElement(ctx: ActionCtx, targetId: string): Pro
   const plan = computeBrushApply(ctx.brushFormat, node)
 
   if (plan.fillColor !== undefined) {
-    const updated = await window.slidesApi.editFill({
+    const updated = await getOfficeHost().editFill({
       slideIndex: ctx.current,
       sourceId: targetId,
       fill: plan.fillColor,
@@ -334,7 +335,7 @@ export async function applyBrushToElement(ctx: ActionCtx, targetId: string): Pro
     if (updated) ctx.applySlide(ctx.current, updated)
   }
   if (plan.stroke !== undefined) {
-    const updated = await window.slidesApi.editStroke({
+    const updated = await getOfficeHost().editStroke({
       slideIndex: ctx.current,
       sourceId: targetId,
       stroke: plan.stroke,
@@ -344,7 +345,7 @@ export async function applyBrushToElement(ctx: ActionCtx, targetId: string): Pro
   if ((plan.runFormat || plan.align) && (node.type === 'shape' || node.type === 'text')) {
     const paras = buildEditParagraphsWithFormat(node, plan.runFormat, plan.align)
     if (paras) {
-      const updated = await window.slidesApi.editText({
+      const updated = await getOfficeHost().editText({
         slideIndex: ctx.current,
         sourceId: targetId,
         paragraphs: paras,

@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { collectExportFontCss, familyNames } from '../src/renderer/export-fonts'
@@ -59,6 +60,7 @@ describe('export fonts', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
     ;(window as { slidesApi?: unknown }).slidesApi = { privateFontFaces: async () => [] }
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 
     const css = await collectExportFontCss(['Calibri, Carlito, Arial, sans-serif'])
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -76,6 +78,7 @@ describe('export fonts', () => {
       ],
       privateFontData: async (id: string) => (id === 'f1' ? BYTES : null),
     }
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const css = await collectExportFontCss(["'Meiryo UI', Meiryo, sans-serif"])
     expect(css).toBe(
       `@font-face{font-family:"Meiryo UI";src:url(data:font/ttf;base64,${B64});font-weight:700;font-style:normal;font-display:block}`,

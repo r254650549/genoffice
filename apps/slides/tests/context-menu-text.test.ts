@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildCtxItems } from '../src/renderer/context-menu-items'
 import * as styleActions from '../src/renderer/style-actions'
@@ -47,6 +48,7 @@ describe('text edit context menu', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(window as unknown as { slidesApi: unknown }).slidesApi = { nativeClipboard }
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     document.execCommand = vi.fn()
   })
 

@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Insert-tab actions extracted from App.tsx: shapes/text boxes,
  * images, tables, icons, charts, SmartArt, WordArt, fields, links, Zoom,
@@ -38,11 +39,11 @@ import { insertSlideZooms } from './zoom-actions'
  * spans several IPC calls must not cost several ⌘Z presses.
  */
 async function batched<T>(fn: () => Promise<T>): Promise<T> {
-  const opened = await window.slidesApi.beginHistoryBatch()
+  const opened = await getOfficeHost().beginHistoryBatch()
   try {
     return await fn()
   } finally {
-    if (opened) await window.slidesApi.endHistoryBatch()
+    if (opened) await getOfficeHost().endHistoryBatch()
   }
 }
 
@@ -59,7 +60,7 @@ export async function insertShapeAt(
   // drops every snapshot past its start, so a batch opened after the insert would
   // collapse only the flips and leave "remove the line" as a second ⌘Z.
   await batched(async () => {
-    const r = await window.slidesApi.addElement({
+    const r = await getOfficeHost().addElement({
       slideIndex: current,
       kind,
       xPx: Math.round(rect.x),
@@ -76,7 +77,7 @@ export async function insertShapeAt(
       ...(rect.flipH ? (['h'] as const) : []),
       ...(rect.flipV ? (['v'] as const) : []),
     ]) {
-      const f = await window.slidesApi.flipElements({
+      const f = await getOfficeHost().flipElements({
         slideIndex: current,
         sourceIds: [r.sourceId],
         axis,
@@ -93,7 +94,7 @@ export async function insertTextBoxAt(ctx: ActionCtx, rect: DrawRect): Promise<v
   const { slide, current } = ctx
   if (!slide) return
   const spec = textBoxInsertSpec(rect)
-  const r = await window.slidesApi.addElement({
+  const r = await getOfficeHost().addElement({
     slideIndex: current,
     kind: 'textbox',
     xPx: spec.x,
@@ -111,7 +112,7 @@ export async function insertTextBoxAt(ctx: ActionCtx, rect: DrawRect): Promise<v
 
 export async function insertImage(ctx: ActionCtx): Promise<void> {
   if (!ctx.slide) return
-  const r = await window.slidesApi.insertImage(ctx.current, FIT_WIDTH)
+  const r = await getOfficeHost().insertImage(ctx.current, FIT_WIDTH)
   if (!r) return
   if ('error' in r) {
     ctx.setSelectedIds([])
@@ -126,7 +127,7 @@ export async function insertTable(ctx: ActionCtx, rows: number, cols: number): P
   const { slide, current } = ctx
   if (!slide) return
   const spec = tableInsertSpec(slide, rows)
-  const r = await window.slidesApi.addTable({
+  const r = await getOfficeHost().addTable({
     slideIndex: current,
     rows,
     cols,
@@ -162,7 +163,7 @@ export async function insertIcon(ctx: ActionCtx, def: IconDef, color: string): P
     canvas.getContext('2d')!.drawImage(img, 0, 0, 512, 512)
     const base64 = canvas.toDataURL('image/png').split(',')[1]!
     const size = 96
-    const r = await window.slidesApi.addImageBytes({
+    const r = await getOfficeHost().addImageBytes({
       slideIndex: current,
       base64,
       ext: 'png',
@@ -188,7 +189,7 @@ export async function insertChart(ctx: ActionCtx, kind: ChartPresetDef['kind']):
   if (!slide) return
   const data = chartSampleData(kind)
   const frame = graphicFrameInsertFrame(slide)
-  const r = await window.slidesApi.addChart({
+  const r = await getOfficeHost().addChart({
     slideIndex: current,
     kind,
     categories: data.categories,
@@ -210,7 +211,7 @@ export async function insertSmartArt(ctx: ActionCtx, def: SmartArtDef): Promise<
   const { slide, current } = ctx
   if (!slide) return
   const frame = graphicFrameInsertFrame(slide)
-  const r = await window.slidesApi.addSmartArt({
+  const r = await getOfficeHost().addSmartArt({
     slideIndex: current,
     layout: def.layout,
     items: def.defaultItems,
@@ -231,7 +232,7 @@ export async function insertWordArt(ctx: ActionCtx, preset: WordArtPreset): Prom
   const { slide, current } = ctx
   if (!slide) return
   const spec = wordArtInsertSpec(slide)
-  const r = await window.slidesApi.addElement({
+  const r = await getOfficeHost().addElement({
     slideIndex: current,
     kind: 'textbox',
     xPx: spec.x,
@@ -271,7 +272,7 @@ export async function insertField(ctx: ActionCtx, type: 'datetime' | 'slidenum')
   const isDate = type === 'datetime'
   const w = isDate ? 240 : 100
   const h = 44
-  const r = await window.slidesApi.addElement({
+  const r = await getOfficeHost().addElement({
     slideIndex: current,
     kind: 'textbox',
     xPx: Math.round((slide.widthPx - w) / 2),
@@ -310,7 +311,7 @@ export async function openLinkDialog(ctx: ActionCtx): Promise<void> {
   }
   if (ctx.selectedIds.length !== 1) return
   const sourceId = ctx.selectedIds[0]!
-  const initial = await window.slidesApi.getLink(ctx.current, sourceId)
+  const initial = await getOfficeHost().getLink(ctx.current, sourceId)
   ctx.setLinkDialog({ sourceId, initial })
 }
 
@@ -323,7 +324,7 @@ export async function applyLink(ctx: ActionCtx, target: LinkTargetOp | null): Pr
     return
   }
   if (!ctx.linkDialog.sourceId) return
-  const updated = await window.slidesApi.setLink({
+  const updated = await getOfficeHost().setLink({
     slideIndex: ctx.current,
     sourceId: ctx.linkDialog.sourceId,
     target,
@@ -342,7 +343,7 @@ export async function insertZoom(ctx: ActionCtx, target: number): Promise<void> 
 
 export async function openHeaderFooter(ctx: ActionCtx): Promise<void> {
   if (!ctx.slide) return
-  ctx.setHfDialog(await window.slidesApi.getHeaderFooter(ctx.current))
+  ctx.setHfDialog(await getOfficeHost().getHeaderFooter(ctx.current))
 }
 
 export async function applyHf(
@@ -350,7 +351,7 @@ export async function applyHf(
   opts: { footer: string | null; slideNum: boolean; date: string | null; dateAuto: boolean },
 ): Promise<void> {
   ctx.setHfDialog(null)
-  const updated = await window.slidesApi.applyHeaderFooter({ ...opts, fitWidthPx: FIT_WIDTH })
+  const updated = await getOfficeHost().applyHeaderFooter({ ...opts, fitWidthPx: FIT_WIDTH })
   if (updated) {
     ctx.setSlides(updated)
     ctx.setSelectedIds([])
@@ -371,7 +372,7 @@ export async function insertEquation(ctx: ActionCtx, text: string): Promise<void
   const { slide, current } = ctx
   if (!slide) return
   const frame = equationInsertFrame(slide)
-  const r = await window.slidesApi.addElement({
+  const r = await getOfficeHost().addElement({
     slideIndex: current,
     kind: 'textbox',
     xPx: frame.x,
@@ -398,7 +399,7 @@ export async function insertEquation(ctx: ActionCtx, text: string): Promise<void
 
 export async function insertMediaFile(ctx: ActionCtx, kind: 'video' | 'audio'): Promise<void> {
   if (!ctx.slide) return
-  const r = await window.slidesApi.insertMedia(ctx.current, kind, FIT_WIDTH)
+  const r = await getOfficeHost().insertMedia(ctx.current, kind, FIT_WIDTH)
   if (r) {
     ctx.applySlide(ctx.current, r.slide)
     ctx.setSelectedIds([r.sourceId])
@@ -423,7 +424,7 @@ export async function insertDroppedMedia(
   const source = path
     ? { path }
     : { base64: bytesToBase64(new Uint8Array(await file.arrayBuffer())) }
-  const r = await window.slidesApi.addMediaBytes({
+  const r = await getOfficeHost().addMediaBytes({
     slideIndex,
     kind,
     ext: fileExt(file.name),
@@ -451,7 +452,7 @@ export function bytesToBase64(bytes: Uint8Array): string {
 
 export async function insertModel3dFile(ctx: ActionCtx): Promise<void> {
   if (!ctx.slide) return
-  const r = await window.slidesApi.insertModel3d(ctx.current, FIT_WIDTH)
+  const r = await getOfficeHost().insertModel3d(ctx.current, FIT_WIDTH)
   if (r) {
     ctx.applySlide(ctx.current, r.slide)
     ctx.setSelectedIds([r.sourceId])
@@ -487,7 +488,7 @@ export async function toggleScreenRecord(ctx: ActionCtx): Promise<void> {
         ctx.setStatus(t('appStatusRecordingEmpty'))
         return
       }
-      const r = await window.slidesApi.addMediaBytes({
+      const r = await getOfficeHost().addMediaBytes({
         slideIndex,
         kind: 'video',
         base64: bytesToBase64(new Uint8Array(await blob.arrayBuffer())),

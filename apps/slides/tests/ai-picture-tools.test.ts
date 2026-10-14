@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 /** AI picture tool replace_image: dispatch and guards (crop/opacity moved to apply_ops setPictureSrcRect/setPictureOpacity). */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createSlidesSkill, type DeckAccess } from '../src/renderer/ai/slides-skill'
@@ -62,6 +63,7 @@ beforeEach(() => {
     editPictureOpacity: vi.fn(async () => deck),
     replacePictureUrl: vi.fn(async () => deck),
   }
+  configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 })
 const api = () =>
   (window as unknown as { slidesApi: Record<string, ReturnType<typeof vi.fn>> }).slidesApi

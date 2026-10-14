@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './../office-host'
 /**
  * Find/replace floating panel (⌘F) — modeled on PowerPoint "Home → Find/Replace".
  * Find works on render-tree text (element-granularity hits, page jump + select); replace goes
@@ -122,7 +123,7 @@ export function FindReplaceDialog({
       findNext()
       return
     }
-    const r = await window.slidesApi.findReplace({
+    const r = await getOfficeHost().findReplace({
       find: query,
       replace: replaceText,
       matchCase,

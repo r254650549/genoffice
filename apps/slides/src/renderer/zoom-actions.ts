@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Insert > Zoom: Slide Zoom / Section Zoom / Summary Zoom. Every tile is a snapshot picture
  * of its target slide (what PowerPoint writes as the fallback image for older viewers) with a
@@ -27,11 +28,11 @@ interface ZoomTile {
 const sortUnique = (indexes: number[]): number[] => [...new Set(indexes)].sort((a, b) => a - b)
 
 async function batched<T>(fn: () => Promise<T>): Promise<T> {
-  const opened = await window.slidesApi.beginHistoryBatch()
+  const opened = await getOfficeHost().beginHistoryBatch()
   try {
     return await fn()
   } finally {
-    if (opened) await window.slidesApi.endHistoryBatch()
+    if (opened) await getOfficeHost().endHistoryBatch()
   }
 }
 
@@ -54,7 +55,7 @@ async function placeTiles(
   for (const [i, tile] of tiles.entries()) {
     const png = pngs[i]
     if (!png) continue
-    const r = await window.slidesApi.addImageBytes({
+    const r = await getOfficeHost().addImageBytes({
       slideIndex,
       base64: png,
       ext: 'png',
@@ -66,7 +67,7 @@ async function placeTiles(
       name: tile.name,
     })
     if (!r || 'error' in r) continue
-    const linked = await window.slidesApi.setLink({
+    const linked = await getOfficeHost().setLink({
       slideIndex,
       sourceId: r.sourceId,
       target: { kind: 'slide', slideIndex: tile.target },
@@ -185,23 +186,23 @@ async function insertSummarySlide(
   before: number,
 ): Promise<{ slides: RenderSlide[]; index: number } | null> {
   const layoutPath = summaryLayoutPath(
-    ctx.layouts ?? (await window.slidesApi.getLayouts())?.layouts ?? null,
+    ctx.layouts ?? (await getOfficeHost().getLayouts())?.layouts ?? null,
   )
   if (!layoutPath) {
-    return window.slidesApi.addBlankSlide({
+    return getOfficeHost().addBlankSlide({
       sourceIndex: Math.max(before - 1, 0),
       fitWidthPx: FIT_WIDTH,
       ...(before === 0 ? { before: true } : {}),
     })
   }
-  const r = await window.slidesApi.addSlideWithLayout({
+  const r = await getOfficeHost().addSlideWithLayout({
     sourceIndex: Math.max(before - 1, 0),
     layoutPath,
     fitWidthPx: FIT_WIDTH,
   })
   if (!r || before > 0) return r
   // The layout op only appends after a slide; landing at position 0 takes one more move
-  const moved = await window.slidesApi.moveSlide({ fromIndex: r.index, toIndex: 0 })
+  const moved = await getOfficeHost().moveSlide({ fromIndex: r.index, toIndex: 0 })
   return moved ? { slides: moved.slides, index: 0 } : r
 }
 
@@ -228,7 +229,7 @@ export async function insertSummaryZoom(ctx: ActionCtx, slideIndices: number[]):
     )
     if (body) {
       box = { x: body.box.x, y: body.box.y, w: body.box.w, h: body.box.h }
-      const cleared = await window.slidesApi.deleteElement({
+      const cleared = await getOfficeHost().deleteElement({
         slideIndex: index,
         sourceId: body.sourceId,
       })
@@ -250,7 +251,7 @@ export async function insertSummaryZoom(ctx: ActionCtx, slideIndices: number[]):
       chosen,
       (pos) => slideTitleText(slides[pos]!) || t('appSectionN', { n: pos + 1 }),
     )
-    const sections = (await window.slidesApi.setSections(wanted)) ?? wanted
+    const sections = (await getOfficeHost().setSections(wanted)) ?? wanted
     return { slides, index, sections, count: placed.ids.length }
   })
   if (!done) return

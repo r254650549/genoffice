@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Global keyboard shortcuts extracted from App.tsx: ⌘Z undo, ⌘F
  * find, zoom, element clipboard, format painter, selection cycling, nudging…
@@ -492,7 +493,7 @@ async function commitTransforms(
     )
     return
   }
-  const updated = await window.slidesApi.editTransformMulti({
+  const updated = await getOfficeHost().editTransformMulti({
     slideIndex: ctx.current,
     fitWidthPx: FIT_WIDTH,
     items,

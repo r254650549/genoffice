@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 /**
  * Tests for the layout tool trio (benchmarked against the Google Slides plugin approach):
  *  - runLayoutScript: sandbox-execute the AI layout script, collecting setBox operations
@@ -254,6 +255,7 @@ describe('execute_layout_script tool', () => {
         }),
       },
     }
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
   })
 
   it('script → atomic apply → audit passes', async () => {

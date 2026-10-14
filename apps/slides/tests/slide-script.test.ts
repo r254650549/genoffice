@@ -5,6 +5,7 @@
  *  - Tool chain: script -> batchEditTransform + editText/editFill/editStroke dispatched in order -> audit report back
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { configureOfficeHost } from '../src/renderer/office-host'
 import type { RenderSlide, RenderNode, ShapeRenderNode, PlacedBox } from '@genoffice/pptx-render'
 import { runLayoutScript, type LayoutScriptElement } from '../src/renderer/ai/layout-script'
 import { createSlidesSkill, type DeckAccess } from '../src/renderer/ai/slides-skill'
@@ -703,6 +704,7 @@ describe('execute_slide_script tool', () => {
         }),
       },
     }
+    configureOfficeHost((globalThis as any).window.slidesApi)
   })
 
   it('mixed script: one IPC carrying merged geometry + ordered edits', async () => {

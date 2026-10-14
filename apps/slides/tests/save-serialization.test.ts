@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { describe, expect, it, vi } from 'vitest'
 
 // file-actions pulls export-render → pptx-render → konva → native `canvas`
@@ -78,6 +79,7 @@ describe('slides save serialization', () => {
       return { ok: true }
     })
     vi.stubGlobal('window', { slidesApi: { save: mockSave } })
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 
     // Fire three saves simultaneously — they must queue, not overlap.
     const [a, b, c] = await Promise.all([save(ctx), save(ctx, true), save(ctx)])
@@ -105,6 +107,7 @@ describe('slides save serialization', () => {
     const mockSave = vi.fn(track)
     const mockSaveAs = vi.fn(track)
     vi.stubGlobal('window', { slidesApi: { save: mockSave, saveAs: mockSaveAs } })
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 
     // A manual save racing Save As (or close-save) must queue behind it.
     const [saved, _] = await Promise.all([save(ctx, true), saveAs(ctx)])
@@ -125,6 +128,7 @@ describe('slides save serialization', () => {
       return { ok: true }
     })
     vi.stubGlobal('window', { slidesApi: { save: mockSave } })
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 
     const first = save(ctx, true)
     const second = save(ctx, true)
@@ -145,6 +149,7 @@ describe('slides save serialization', () => {
       return { ok: true }
     })
     vi.stubGlobal('window', { slidesApi: { save: mockSave } })
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 
     const seen: number[] = []
     const getCtx = () => {

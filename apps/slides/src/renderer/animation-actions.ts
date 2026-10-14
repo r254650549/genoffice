@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Transition and animation actions extracted from App.tsx.
  * Functions take the ActionCtx built fresh per call.
@@ -13,7 +14,7 @@ export async function applyTransition(
   kind: TransitionKind,
   allSlides: boolean,
 ): Promise<void> {
-  const ok = await window.slidesApi.setTransition({
+  const ok = await getOfficeHost().setTransition({
     slideIndex: allSlides ? -1 : ctx.current,
     kind,
   })
@@ -56,13 +57,13 @@ export function hoverPreviewAnimation(
 
 /** Commit the whole page's animation list overwrite-style, then read back on success (target names/stale items per the main process). */
 export async function commitAnimations(ctx: ActionCtx, items: AnimationItem[]): Promise<void> {
-  const ok = await window.slidesApi.setAnimations({
+  const ok = await getOfficeHost().setAnimations({
     slideIndex: ctx.current,
     items: items.map(({ targetName: _t, ...rest }) => rest),
   })
   if (!ok) return
   ctx.setDirty(true)
-  ctx.setAnimations(await window.slidesApi.getAnimations(ctx.current))
+  ctx.setAnimations(await getOfficeHost().getAnimations(ctx.current))
 }
 
 /** Paragraph count of a text-bearing node ("by paragraph" animation splitting). */

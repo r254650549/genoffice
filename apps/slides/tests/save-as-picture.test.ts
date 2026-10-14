@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SavePictureOp, SavePictureResult } from '../src/shared/ipc'
 import type { ActionCtx } from '../src/renderer/action-context'
@@ -18,6 +19,7 @@ function setup(over: Partial<Record<keyof ActionCtx, unknown>> = {}) {
     })),
   }
   vi.stubGlobal('window', { slidesApi: api })
+  configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
   const ctx = {
     current: 0,
     selectedIds: ['a', 'b'],

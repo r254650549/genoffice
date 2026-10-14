@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   EQUATION_BODY_PR,
@@ -202,6 +203,7 @@ describe('insert actions use the measured frames', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(window as unknown as { slidesApi: unknown }).slidesApi = api
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const result = { slide: slides[0], sourceId: 'sp9' }
     api.addElement.mockResolvedValue(result)
     api.addChart.mockResolvedValue(result)

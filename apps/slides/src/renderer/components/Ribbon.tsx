@@ -1,3 +1,4 @@
+import { getOfficeHost } from '../office-host'
 /**
  * Ribbon: tab bar + grouped buttons. Same mechanism as the apps/docs Ribbon
  * (local state switches tabs, .ribbon-body dispatches); content is trimmed to slide capabilities,
@@ -1748,14 +1749,16 @@ export function Ribbon({
             </button>
             {fileOpen && (
               <div className="file-menu">
-                <button
-                  onClick={() => {
-                    setFileOpen(false)
-                    onOpen()
-                  }}
-                >
-                  {t('ribbonFileOpen')} <span className="file-menu-key">Ctrl+O</span>
-                </button>
+                {getOfficeHost().kind !== 'web' && (
+                  <button
+                    onClick={() => {
+                      setFileOpen(false)
+                      onOpen()
+                    }}
+                  >
+                    {t('ribbonFileOpen')} <span className="file-menu-key">Ctrl+O</span>
+                  </button>
+                )}
                 <button
                   disabled={!hasDoc}
                   onClick={() => {

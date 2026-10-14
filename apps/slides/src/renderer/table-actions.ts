@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Table editing actions extracted from App.tsx: row/column
  * structure, merge/split, resize, cell text commit and Tab navigation.
@@ -15,7 +16,7 @@ export async function tableStructureOp(
   index: number,
   before?: boolean,
 ): Promise<void> {
-  const r = await window.slidesApi.tableStructure({
+  const r = await getOfficeHost().tableStructure({
     slideIndex: ctx.current,
     sourceId,
     kind,
@@ -42,7 +43,7 @@ export async function tableMergeOp(
   row: number,
   col: number,
 ): Promise<void> {
-  const r = await window.slidesApi.tableMerge({
+  const r = await getOfficeHost().tableMerge({
     slideIndex: ctx.current,
     sourceId,
     kind,
@@ -64,7 +65,7 @@ export async function onTableColResize(
   col: number,
   wPx: number,
 ): Promise<void> {
-  const updated = await window.slidesApi.setTableColWidth({
+  const updated = await getOfficeHost().setTableColWidth({
     slideIndex: ctx.current,
     sourceId,
     col,
@@ -80,7 +81,7 @@ export async function onTableRowResize(
   row: number,
   hPx: number,
 ): Promise<void> {
-  const updated = await window.slidesApi.setTableRowHeight({
+  const updated = await getOfficeHost().setTableRowHeight({
     slideIndex: ctx.current,
     sourceId,
     row,
@@ -92,7 +93,7 @@ export async function onTableRowResize(
 
 export async function commitCellEdit(ctx: ActionCtx, paragraphs: EditParagraph[]): Promise<void> {
   if (!ctx.editingCell) return
-  const updated = await window.slidesApi.editTableCell({
+  const updated = await getOfficeHost().editTableCell({
     slideIndex: ctx.current,
     sourceId: ctx.editingCell.sourceId,
     row: ctx.editingCell.row,
@@ -115,7 +116,7 @@ export async function navigateCell(
   const tbl = slide.nodes.find((n) => n.sourceId === editingCell.sourceId)
   if (!tbl || tbl.type !== 'table') return
   if (paragraphs) {
-    const updated = await window.slidesApi.editTableCell({
+    const updated = await getOfficeHost().editTableCell({
       slideIndex: current,
       sourceId: editingCell.sourceId,
       row: editingCell.row,
@@ -134,7 +135,7 @@ export async function navigateCell(
   if (dir > 0) {
     // Tab on the last cell: add a row and enter its first cell
     const lastRow = Math.max(...cells.map((c) => c.row))
-    const r = await window.slidesApi.tableStructure({
+    const r = await getOfficeHost().tableStructure({
       slideIndex: current,
       sourceId: editingCell.sourceId,
       kind: 'insert-row',

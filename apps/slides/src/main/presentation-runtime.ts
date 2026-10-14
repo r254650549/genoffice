@@ -4,10 +4,43 @@ import { createBlankPptx, openPptx, savePptx, commitSaved } from '@genoffice/ppt
 import type { ApplyTxnOp, ApplyTxnResult } from '../shared/ipc'
 import {
   createSlidesDocumentRuntime,
+  deckDefaultFont,
   type Session,
   type SlidesDocumentHost,
 } from './session-document'
 import { createSlidesDocumentOperations } from './document-operations'
+import {
+  registerSlidesDocumentHandlers,
+  type SlidesDocumentEvent,
+  type SlidesDocumentPorts,
+} from './document-handlers'
+import { readDeckModel } from './deck-reader'
+
+export const presentationReadChannels = new Set([
+  'slides:get-render-slides',
+  'slides:get-layouts',
+  'slides:get-slide-size',
+  'slides:chart-color-schemes',
+  'slides:get-chart-data',
+  'slides:get-link',
+  'slides:get-slide-links',
+  'slides:get-run-links',
+  'slides:get-header-footer',
+  'slides:get-transition',
+  'slides:get-animations',
+  'slides:get-shape-keys',
+  'slides:get-sections',
+  'slides:get-notes',
+  'slides:get-comments',
+  'slides:is-dirty',
+  'slides:clipboard-external',
+  'slides:clipboard-probe',
+  'slides:has-slide-clipboard',
+  'slides:copy-elements',
+  'slides:copy-elements-image',
+  'slides:copy-slides',
+  'slides:media-data',
+])
 
 type Mutation = { kind: 'apply'; transaction: ApplyTxnOp } | { kind: 'undo' | 'redo' }
 type Result = { revision: number; result: ApplyTxnResult }
@@ -21,28 +54,122 @@ export class PresentationRuntime {
   private revision = 0
   private readonly receipts = new Map<string, Receipt>()
   private prepared: { token: string; revision: number; sha256: string } | null = null
+  private serialized: { revision: number; bytes: Uint8Array; sha256: string } | null = null
+  private handlers = new Map<string, (event: SlidesDocumentEvent, ...args: any[]) => any>()
+  private senderId = 1
+  private baseline: string
 
   private constructor(session: Session, host: SlidesDocumentHost) {
     this.session = session
     this.document = createSlidesDocumentRuntime(host)
     this.operations = createSlidesDocumentOperations(this.document)
+    this.baseline = this.fingerprint()
+  }
+  private fingerprint() {
+    return createHash('sha256')
+      .update(
+        JSON.stringify(
+          {
+            slides: this.session.opened.deck.slides,
+            size: this.session.opened.deck.size,
+            entries: [...this.session.opened.archive.entries],
+          },
+          (key, value) =>
+            key === 'metaDirty' || /^dirty/.test(key)
+              ? undefined
+              : value instanceof Uint8Array
+                ? createHash('sha256').update(value).digest('hex')
+                : value,
+        ),
+      )
+      .digest('hex')
+  }
+  private dirty() {
+    return this.document.sessionDirty(this.session) || this.fingerprint() !== this.baseline
   }
 
-  static async open(bytes: Uint8Array | null, host: SlidesDocumentHost, fitWidthPx = 1280) {
+  static async open(
+    bytes: Uint8Array | null,
+    host: SlidesDocumentHost,
+    fitWidthPx = 1280,
+    revision = 0,
+    restoredDirty = false,
+  ) {
     if (!Number.isFinite(fitWidthPx) || fitWidthPx < 1 || fitWidthPx > 8192)
       throw new Error('PPTX_VIEWPORT_INVALID')
     const opened = await openPptx(bytes ?? (await createBlankPptx()))
-    return new PresentationRuntime(
+    const runtime = new PresentationRuntime(
       { path: '', opened, fitWidthPx, undoStack: [], redoStack: [] },
       host,
     )
+    runtime.revision = revision
+    runtime.session.metaDirty = restoredDirty
+    return runtime
+  }
+
+  configureHandlers(
+    ports: SlidesDocumentPorts,
+    shared?: {
+      handlers: Map<string, (event: SlidesDocumentEvent, ...args: any[]) => any>
+      sessions: Map<number, Session>
+      id: number
+    },
+  ) {
+    if (shared) {
+      this.handlers = shared.handlers
+      this.senderId = shared.id
+      shared.sessions.set(shared.id, this.session)
+    } else
+      registerSlidesDocumentHandlers(
+        { handle: (channel, handler) => this.handlers.set(channel, handler) },
+        new Map([[1, this.session]]),
+        this.document,
+        ports,
+      )
+  }
+  readDeck() {
+    return { ...readDeckModel(this.session), revision: this.revision, dirty: this.dirty() }
+  }
+  async invoke(channel: string, args: unknown[], expectedRevision: number) {
+    if (expectedRevision !== this.revision) throw new Error('PPTX_DRAFT_CONFLICT')
+    const handler = this.handlers.get(channel)
+    if (!handler) throw new Error('PPTX_COMMAND_UNSUPPORTED')
+    const before = presentationReadChannels.has(channel) ? undefined : this.fingerprint()
+    let value: any
+    try {
+      value = await handler(
+        { sender: { id: this.senderId, cut() {}, copy() {}, paste() {} } },
+        ...args,
+      )
+    } catch (error) {
+      if (before !== undefined && this.fingerprint() !== before) {
+        this.revision++
+        this.prepared = null
+        this.serialized = null
+        throw new Error('PPTX_OPERATION_OUTCOME_UNKNOWN', { cause: error })
+      }
+      throw error
+    }
+    if (
+      !presentationReadChannels.has(channel) &&
+      value !== null &&
+      value !== false &&
+      !(channel === 'slides:apply-txn' && !value?.applied) &&
+      !channel.startsWith('slides:history-batch')
+    ) {
+      this.revision++
+      this.prepared = null
+      this.serialized = null
+    }
+    return { value: channel === 'slides:is-dirty' ? this.dirty() : value, state: this.read() }
   }
 
   read() {
     const { session } = this
     return {
       revision: this.revision,
-      dirty: this.document.sessionDirty(session),
+      defaultFont: deckDefaultFont(session.opened),
+      dirty: this.dirty(),
       canUndo: session.undoStack.length > 0,
       canRedo: session.redoStack.length > 0,
       size: { ...session.opened.deck.size },
@@ -94,6 +221,7 @@ export class PresentationRuntime {
       if (result.applied) {
         this.revision += 1
         this.prepared = null
+        this.serialized = null
       }
       receipt.result = { revision: this.revision, result }
       return structuredClone(receipt.result)
@@ -108,12 +236,16 @@ export class PresentationRuntime {
   /** Serialize a private draft; only the authenticated owner publishes its bytes. */
   async prepareSave(expectedRevision: number) {
     if (expectedRevision !== this.revision) throw new Error('PPTX_DRAFT_CONFLICT')
-    const bytes = await savePptx(this.session.opened)
+    const bytes =
+      this.serialized?.revision === expectedRevision
+        ? this.serialized.bytes
+        : await savePptx(this.session.opened)
     if (expectedRevision !== this.revision) throw new Error('PPTX_DRAFT_CONFLICT')
     const sha256 = createHash('sha256').update(bytes).digest('hex')
+    this.serialized = { revision: expectedRevision, bytes, sha256 }
     const token = randomUUID()
     this.prepared = { token, revision: expectedRevision, sha256 }
-    return { token, revision: expectedRevision, sha256, bytes }
+    return { token, revision: expectedRevision, sha256, bytes: new Uint8Array(bytes) }
   }
 
   /** A failed cloud/workspace write never clears dirty state. */
@@ -129,6 +261,7 @@ export class PresentationRuntime {
       throw new Error('PPTX_SAVE_CONFLICT')
     commitSaved(this.session.opened)
     this.session.metaDirty = false
+    this.baseline = this.fingerprint()
     this.prepared = null
     return this.read()
   }

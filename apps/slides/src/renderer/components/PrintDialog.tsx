@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './../office-host'
 /**
  * Print dialog modeled on PowerPoint's print sheet: live page preview on the left
  * (the exact pages that will print, built by the shared print-html assembly),
@@ -71,7 +72,7 @@ export function PrintDialog({
     void (async () => {
       try {
         const rendered = await renderSlidesToPngBase64(slides, images)
-        const noteTexts = await Promise.all(slides.map((_s, i) => window.slidesApi.getNotes(i)))
+        const noteTexts = await Promise.all(slides.map((_s, i) => getOfficeHost().getNotes(i)))
         if (!alive) return
         blobUrlsRef.current = rendered.map((b64) =>
           URL.createObjectURL(
@@ -155,7 +156,7 @@ export function PrintDialog({
     setPrinting(true)
     try {
       const first = slides[selected[0]]
-      const r = await window.slidesApi.printSlides({
+      const r = await getOfficeHost().printSlides({
         pngsBase64: selected.map((i) => pngs[i]),
         widthPx: first.widthPx,
         heightPx: first.heightPx,

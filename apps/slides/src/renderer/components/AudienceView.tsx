@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './../office-host'
 /**
  * Audience show window — the presenter view's external-screen full-screen playback end
  * (?mode=audience entry).
@@ -94,11 +95,13 @@ export function AudienceView() {
   useEffect(() => {
     let stop = false
     const tryLoad = (attempt: number) => {
-      void window.slidesApi.getRenderSlides().then((r) => {
-        if (stop) return
-        if (r && r.length > 0) setSlides(r)
-        else if (attempt < 20) window.setTimeout(() => tryLoad(attempt + 1), 250)
-      })
+      void getOfficeHost()
+        .getRenderSlides()
+        .then((r) => {
+          if (stop) return
+          if (r && r.length > 0) setSlides(r)
+          else if (attempt < 20) window.setTimeout(() => tryLoad(attempt + 1), 250)
+        })
     }
     tryLoad(0)
     return () => {
@@ -112,7 +115,7 @@ export function AudienceView() {
   // the fresh deck instead of keeping stale animation state.
   useEffect(
     () =>
-      window.slidesApi.onDeckChanged?.(({ slides: all }) => {
+      getOfficeHost().onDeckChanged?.(({ slides: all }) => {
         if (all.length === 0) return
         cursorRef.current = ''
         setSlides(all)
@@ -123,13 +126,13 @@ export function AudienceView() {
   useEffect(() => {
     if (!slides) return
     let cancelled = false
-    void Promise.all(slides.map((_, i) => window.slidesApi.getTransition(i))).then((kinds) => {
+    void Promise.all(slides.map((_, i) => getOfficeHost().getTransition(i))).then((kinds) => {
       if (!cancelled) transRef.current = kinds
     })
-    void Promise.all(slides.map((_, i) => window.slidesApi.getAnimations(i))).then((lists) => {
+    void Promise.all(slides.map((_, i) => getOfficeHost().getAnimations(i))).then((lists) => {
       if (!cancelled) setAllAnims(lists)
     })
-    void Promise.all(slides.map((_, i) => window.slidesApi.getShapeKeys(i))).then((keys) => {
+    void Promise.all(slides.map((_, i) => getOfficeHost().getShapeKeys(i))).then((keys) => {
       if (!cancelled) keysRef.current = keys
     })
     return () => {
@@ -138,8 +141,8 @@ export function AudienceView() {
   }, [slides])
 
   useEffect(() => {
-    const offSync = window.slidesApi.onShowSync(setSync)
-    const offInk = window.slidesApi.onShowInk((ev) => {
+    const offSync = getOfficeHost().onShowSync(setSync)
+    const offInk = getOfficeHost().onShowInk((ev) => {
       if (ev.type === 'clear') {
         setStrokes([])
         setLaser(null)
@@ -156,9 +159,11 @@ export function AudienceView() {
       }
     })
     // When mounted after the presenter's first broadcast, snapshot the current state
-    void window.slidesApi.audienceReady().then((s) => {
-      if (s) setSync((prev) => prev ?? s)
-    })
+    void getOfficeHost()
+      .audienceReady()
+      .then((s) => {
+        if (s) setSync((prev) => prev ?? s)
+      })
     return () => {
       offSync()
       offInk()
@@ -176,7 +181,7 @@ export function AudienceView() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        window.slidesApi.audienceNav('exit')
+        getOfficeHost().audienceNav('exit')
       } else if (
         e.key === 'ArrowRight' ||
         e.key === 'ArrowDown' ||
@@ -185,10 +190,10 @@ export function AudienceView() {
         e.key === 'PageDown'
       ) {
         e.preventDefault()
-        window.slidesApi.audienceNav('next')
+        getOfficeHost().audienceNav('next')
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
         e.preventDefault()
-        window.slidesApi.audienceNav('prev')
+        getOfficeHost().audienceNav('prev')
       }
     }
     window.addEventListener('keydown', onKey, true)
@@ -248,10 +253,10 @@ export function AudienceView() {
   return (
     <div
       className="slideshow"
-      onClick={() => window.slidesApi.audienceNav('next')}
+      onClick={() => getOfficeHost().audienceNav('next')}
       onContextMenu={(e) => {
         e.preventDefault()
-        window.slidesApi.audienceNav('prev')
+        getOfficeHost().audienceNav('prev')
       }}
     >
       {sync.ended ? (

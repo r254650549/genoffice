@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { tmpdir } from 'node:os'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -85,6 +86,7 @@ beforeEach(async () => {
       endHistoryBatch: () => ipc('slides:history-batch-end'),
     },
   })
+  configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 })
 
 function ctx(): ActionCtx {

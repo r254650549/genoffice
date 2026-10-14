@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createBlankPptx, openPptx } from '@genoffice/pptx-engine'
 import { HeuristicMetrics } from '@genoffice/pptx-render'
 import { PresentationRuntime } from '../src/main/presentation-runtime'
@@ -19,6 +19,31 @@ const apply = (runtime: PresentationRuntime, ops: unknown[], dryRun = false) =>
   })
 
 describe('Node presentation host with original GenOffice document operations', () => {
+  it('keeps serialized bytes stable at the same revision across ZIP timestamps', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date('2026-10-14T00:00:00Z'))
+      const runtime = await PresentationRuntime.open(null, host)
+      apply(runtime, [text])
+      const first = await runtime.prepareSave(1)
+      vi.setSystemTime(new Date('2026-10-14T00:00:10Z'))
+      const second = await runtime.prepareSave(1)
+      expect(second.bytes).toEqual(first.bytes)
+      expect(second.sha256).toBe(first.sha256)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+  it('compares undo and redo with the last saved baseline, including undo across save', async () => {
+    const runtime = await PresentationRuntime.open(null, host)
+    apply(runtime, [text])
+    const saved = await runtime.prepareSave(1)
+    runtime.acceptSaved(saved.token, 1, saved.sha256)
+    runtime.mutate(randomUUID(), 1, { kind: 'undo' })
+    expect(runtime.read()).toMatchObject({ revision: 2, dirty: true })
+    runtime.mutate(randomUUID(), 2, { kind: 'redo' })
+    expect(runtime.read()).toMatchObject({ revision: 3, dirty: false })
+  })
   it('opens a blank deck clean without naming or publishing a file', async () => {
     const runtime = await PresentationRuntime.open(null, host)
     expect(runtime.read()).toMatchObject({ revision: 0, dirty: false, canUndo: false })

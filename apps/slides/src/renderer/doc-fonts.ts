@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Office-private font registration. Layout (main process) may resolve run fonts to files
  * Chromium cannot see (PowerPoint's bundled DFonts, Office cloud fonts); glyph positions are
@@ -20,7 +21,7 @@ export async function syncPrivateFonts(): Promise<void> {
   window.__genofficeDocFontsSynced = false
   let faces: Array<{ id: string; family: string; bold: boolean; italic: boolean }>
   try {
-    faces = await window.slidesApi.privateFontFaces()
+    faces = await getOfficeHost().privateFontFaces()
   } catch {
     window.__genofficeDocFontsSynced = true
     return
@@ -36,7 +37,7 @@ export async function syncPrivateFonts(): Promise<void> {
       .map(async (f) => {
         requested.add(f.id)
         try {
-          const data = await window.slidesApi.privateFontData(f.id)
+          const data = await getOfficeHost().privateFontData(f.id)
           if (!data) return false
           const face = new FontFace(f.family, data, {
             weight: f.bold ? '700' : '400',

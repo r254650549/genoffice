@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 /** Skill-layer behavior of the regenerate_slide (redo one page in place) tool. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createSlidesSkill, type DeckAccess } from '../src/renderer/ai/slides-skill'
@@ -31,6 +32,7 @@ const call = (name: string, input: Record<string, unknown>): AgentToolCall => ({
 
 beforeEach(() => {
   ;(window as any).slidesApi = { deleteSlide: vi.fn(async () => [page, page]) }
+  configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 })
 
 const cloudOk = () => vi.fn(async () => ({ ok: true, marker: 'cloudpptx:/tmp/p.pptx' }))
@@ -192,6 +194,7 @@ describe('regenerate_slide', () => {
       records: [{ op: 'addElement', target: '0', created: ['e1'] }],
       slides: [page],
     }))
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await skill.executeTool!(
       call('apply_ops', {
         ops: [

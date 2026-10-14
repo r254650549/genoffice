@@ -177,3 +177,36 @@ Slides native document host checkpoint (2026-10-14):
 - Next: authenticated existing-environment service, full native renderer's
   OfficeHost/iframe connection, normal cloud save/close and current-draft Agent.
   The parent deliberately leaves PPTX UI disabled until these paths work.
+
+Slides full Web host checkpoint (2026-10-14):
+
+- Extract the 117 original document IPC handlers into document-handlers.ts,
+  with explicit clipboard, image and uploaded-asset ports. Desktop and Node
+  register the same handlers and transaction/history functions. The shell and
+  Web Agent share the original compact deck reader. There is no second editor
+  or OOXML serializer.
+- The complete React/Konva renderer receives an explicit OfficeHost and runs
+  in its own Web iframe. All source calls use that host; no preload proxy,
+  global monkey-patch or build-time source rewrite is used. Web AI actions
+  open the parent KompAgent conversation instead of a second Agent or account.
+- The authenticated actor uses the existing user environment, original system
+  font metrics, bundled Carlito and HarfBuzz. Binary file reads only consume
+  the explicitly uploaded asset, never arbitrary host paths. Original licenses
+  and notices remain in both repositories and runtime artifacts; no ee code.
+- Native document commands expose deck reads, all 72 operation registrations
+  and their guides, structured transactions, images, save and undo/redo.
+  Registration is not a claim that every advanced operation is browser-tested.
+- A stable serialization cache prevents ZIP timestamps changing same-revision
+  bytes. Exact cloud publication acknowledgement establishes the saved
+  baseline; undo across a save remains dirty, redo back to that baseline is
+  clean. Pristine checkpoints are verified by the native actor before the
+  parent removes draft metadata. Unknown effects are queried, never replayed.
+- Web document entry is Drive file clicks, new documents and recent files.
+  Local Office opening and the separate cloud-open shortcut are removed;
+  users upload local Office files to Drive first. Image insertion stays native.
+- Parent browser/model evidence, individual capability bounds and actual
+  PowerPoint/WPS compatibility status are recorded in the parent Office plan.
+- Speaker notes reads use the original getNotes handler. An empty undo/redo
+  reports applied:false rather than a successful mutation. Atomic native batches
+  retain upstream validation: references to newly created pages/tables need a
+  subsequent batch. No substitute document writer is added for this limitation.

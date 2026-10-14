@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   WORDART_BODY_PR,
@@ -63,6 +64,7 @@ describe('insertWordArt', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(window as unknown as { slidesApi: unknown }).slidesApi = { addElement }
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     addElement.mockResolvedValue({ slide, sourceId: 'sp7' })
   })
 

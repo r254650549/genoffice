@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './../office-host'
 import type { AgentSkill, ToolDisplay } from '@genoffice/agent-core'
 import type {
   GroupRenderNode,
@@ -1445,7 +1446,7 @@ async function executeTool(
       // ── Dispatch: the whole script is ONE transaction — the collected primitives go
       //   to the main process in a single IPC and apply atomically through the op
       //   executor (any failure rolls the deck back there and returns a guided error).
-      const applied = await window.slidesApi.applyEditScript({
+      const applied = await getOfficeHost().applyEditScript({
         slideIndex: idx,
         fitWidthPx: access.fitWidthPx,
         boxes: r.ops,
@@ -1479,7 +1480,7 @@ async function executeTool(
     case 'web_search': {
       const query = String(call.input.query ?? '').trim()
       if (!query) return fail(t('aiFailWebSearch'), 'query must not be empty')
-      const r = await window.slidesApi.webSearch(query, Number(call.input.maxResults) || 6)
+      const r = await getOfficeHost().webSearch(query, Number(call.input.maxResults) || 6)
       // a backend failure must not read as "no results" — the model would fabricate conclusions
       if (r.method === 'error') {
         return fail(
@@ -1513,7 +1514,7 @@ async function executeTool(
     case 'image_search': {
       const query = String(call.input.query ?? '').trim()
       if (!query) return fail(t('aiFailImageSearch'), 'query must not be empty')
-      const r = await window.slidesApi.imageSearch(query, Number(call.input.maxResults) || 8)
+      const r = await getOfficeHost().imageSearch(query, Number(call.input.maxResults) || 8)
       // a backend failure must not read as an empty gallery — the model would fabricate image choices
       if (r.method === 'error') {
         return fail(
@@ -1545,7 +1546,7 @@ async function executeTool(
       const refs = Array.isArray(call.input.referenceImageUrls)
         ? (call.input.referenceImageUrls as unknown[]).map(String).filter(Boolean)
         : undefined
-      const r = await window.slidesApi.generateImage({
+      const r = await getOfficeHost().generateImage({
         prompt,
         model: call.input.model ? String(call.input.model) : undefined,
         referenceImageUrls: refs,
@@ -1576,7 +1577,7 @@ async function executeTool(
       const requirements = String(call.input.requirements ?? '').trim()
       if (!mediaUrls.length) return fail(t('aiFailMedia'), 'mediaUrls must not be empty')
       if (!requirements) return fail(t('aiFailMedia'), 'requirements must not be empty')
-      const r = await window.slidesApi.analyzeMedia({ mediaUrls, requirements })
+      const r = await getOfficeHost().analyzeMedia({ mediaUrls, requirements })
       if (!r.text) return fail(t('aiFailMedia'), r.error ?? 'Analysis failed')
       // Analysis text can be very long; truncate to protect context (first 6000 chars are enough to generate deck content)
       const MAX_LEN = 6000
@@ -1606,7 +1607,7 @@ async function executeTool(
         if (!/^(https?|file):\/\//.test(url)) return fail(t('aiFailInsertImage'), 'Invalid url')
         payload = { url }
       }
-      const r = await window.slidesApi.insertImageUrl({
+      const r = await getOfficeHost().insertImageUrl({
         slideIndex: idx,
         ...payload,
         xPx: Number(call.input.x),
@@ -1658,7 +1659,7 @@ async function executeTool(
         if (!/^(https?|file):\/\//.test(url)) return fail(t(failKey), 'Invalid url')
         payload = { url }
       }
-      const updated = await window.slidesApi.replacePictureUrl({
+      const updated = await getOfficeHost().replacePictureUrl({
         slideIndex: idx,
         sourceId,
         ...payload,
@@ -2528,7 +2529,7 @@ async function executeTool(
       if (typeof call.input.dataLabels === 'boolean') op.dataLabels = call.input.dataLabels
       if (typeof call.input.gridlines === 'boolean') op.gridlines = call.input.gridlines
       if (call.input.switchRowCol === true) op.switchRowCol = true
-      const updated = await window.slidesApi.editChart(op)
+      const updated = await getOfficeHost().editChart(op)
       if (!updated)
         return fail(
           t('aiFailChartEdit'),
@@ -2549,7 +2550,7 @@ async function executeTool(
         return fail(t('aiFailApplyOps'), 'ops must be a non-empty array')
       const pre = preflightOps(opsIn, slides, state)
       if (!('ops' in pre)) return pre
-      const r = await window.slidesApi.applyTxn?.({
+      const r = await getOfficeHost().applyTxn?.({
         ops: pre.ops,
         ...(call.input.dry_run === true ? { dryRun: true } : {}),
         ...(call.input.isolation === 'per_op' ? { isolation: 'per_op' as const } : {}),

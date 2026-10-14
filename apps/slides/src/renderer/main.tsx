@@ -1,3 +1,4 @@
+import { configureOfficeHost, getOfficeHost, type OfficeHost } from './office-host'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { htmlDir, htmlLang, type Lang } from '@genoffice/i18n'
@@ -19,6 +20,7 @@ import '@genoffice/ui/ai-scope-quote.css'
 import './styles.css'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
 
+if (import.meta.env.MODE !== 'office-web') configureOfficeHost(window.slidesApi)
 installScreenTips()
 
 // Canvas fillText never triggers @font-face downloads, so the bundled document fonts
@@ -48,8 +50,12 @@ async function bootstrap(): Promise<void> {
     // per-promise catch: standalone runs have no app:get-theme handler, and
     // that rejection must not drop a resolved language
     ;[lang, theme] = await Promise.all([
-      window.slidesApi.getLanguage().catch(() => 'zh' as const),
-      window.slidesApi.getTheme().catch(() => 'system' as const),
+      getOfficeHost()
+        .getLanguage()
+        .catch(() => 'zh' as const),
+      getOfficeHost()
+        .getTheme()
+        .catch(() => 'system' as const),
     ])
   } catch {
     /* dev renderer without the preload bridge */
@@ -60,12 +66,12 @@ async function bootstrap(): Promise<void> {
   // the audience show window renders slide content only — it never themes
   if (mode !== 'audience') {
     applyTheme(theme)
-    window.slidesApi?.onThemeChanged(applyTheme)
-    await window.slidesApi
+    getOfficeHost()?.onThemeChanged(applyTheme)
+    await getOfficeHost()
       ?.getAiPanelPrefs?.()
       .then(applyAiPanelPrefs)
       .catch(() => {})
-    window.slidesApi?.onAiPanelPrefsChanged?.(applyAiPanelPrefs)
+    getOfficeHost()?.onAiPanelPrefsChanged?.(applyAiPanelPrefs)
   }
   createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

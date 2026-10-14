@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { moveSectionDir } from '../src/renderer/slide-actions'
 import type { ActionCtx } from '../src/renderer/action-context'
@@ -44,6 +45,7 @@ describe('moveSectionDir keeps current on the same slide', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(window as unknown as { slidesApi: typeof api }).slidesApi = api
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
   })
 
   it('re-anchors current onto the moved slide', async () => {

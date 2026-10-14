@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   GroupRenderNode,
@@ -364,7 +365,7 @@ export function App() {
   const missingFontsDismissed = useRef(false)
   const refreshMissingFonts = useCallback(() => {
     if (missingFontsDismissed.current) return
-    window.slidesApi
+    getOfficeHost()
       .fontMissing?.()
       .then((m) => setMissingFonts(m ?? []))
       .catch(() => {})
@@ -377,7 +378,7 @@ export function App() {
   // Font store changed (download / local install): re-register FontFaces, refresh the banner
   useEffect(
     () =>
-      window.slidesApi.onFontsChanged?.(() => {
+      getOfficeHost().onFontsChanged?.(() => {
         void syncPrivateFonts()
         refreshMissingFonts()
       }),
@@ -386,7 +387,7 @@ export function App() {
   const downloadMissingFonts = useCallback(async () => {
     setFontBannerBusy(true)
     try {
-      for (const f of missingFonts) await window.slidesApi.fontDownload?.(f)
+      for (const f of missingFonts) await getOfficeHost().fontDownload?.(f)
     } finally {
       setFontBannerBusy(false)
       refreshMissingFonts()
@@ -471,11 +472,13 @@ export function App() {
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
   }
-  const [autoSave, setAutoSave] = useAutoSavePref('ai-slides-auto-save', window.slidesApi)
+  const [autoSave, setAutoSave] = useAutoSavePref('ai-slides-auto-save', getOfficeHost())
   useEffect(() => {
-    window.slidesApi.setAutoSavePref?.(autoSave)
+    getOfficeHost().setAutoSavePref?.(autoSave)
   }, [autoSave])
-  const [showAi, setShowAi] = useState(() => aiPanelInitiallyOpen('ai-slides-show-ai'))
+  const [showAi, setShowAi] = useState(
+    () => getOfficeHost().kind !== 'web' && aiPanelInitiallyOpen('ai-slides-show-ai'),
+  )
   const [showFormat, setShowFormat] = useState(false)
   const [showBgFormat, setShowBgFormat] = useState(false)
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
@@ -488,16 +491,14 @@ export function App() {
     slideShot?: boolean
   } | null>(null)
   const [_recent, setRecent] = useState<string[]>([])
-  const consumePendingRef = useRef<ReturnType<typeof window.slidesApi.consumePendingOpen> | null>(
-    null,
-  )
+  const consumePendingRef = useRef<ReturnType<OfficeHost['consumePendingOpen']> | null>(null)
   const bootHandledRef = useRef(false)
   const [images, setImages] = useState<Map<string, HTMLImageElement>>(new Map())
   const imageLoaderRef = useRef<ReturnType<typeof createImageLoader> | null>(null)
   const [hasClipboard, setHasClipboard] = useState(false)
   // The clipboard is app-wide (copies land from other windows) and external content counts too
   useEffect(() => {
-    const probe = () => void window.slidesApi.clipboardProbe().then(setHasClipboard)
+    const probe = () => void getOfficeHost().clipboardProbe().then(setHasClipboard)
     probe()
     window.addEventListener('focus', probe)
     return () => window.removeEventListener('focus', probe)
@@ -671,12 +672,12 @@ export function App() {
     const pending = notesDraftRef.current
     if (!pending) return
     notesDraftRef.current = null
-    const ok = await window.slidesApi.setNotes({ slideIndex: pending.index, text: pending.text })
+    const ok = await getOfficeHost().setNotes({ slideIndex: pending.index, text: pending.text })
     if (!ok) return
     setDirty(true)
     // read back: the document normalizes what it stores (trailing empty paragraphs), and the
     // baseline must match what a later getNotes returns
-    const stored = await window.slidesApi.getNotes(pending.index)
+    const stored = await getOfficeHost().getNotes(pending.index)
     notesLoadedRef.current = notesBaselineAfterFlush(notesLoadedRef.current, pending.index, stored)
   }, [])
 
@@ -689,7 +690,9 @@ export function App() {
       const viewportW =
         el?.clientWidth ||
         stageViewportSize.w ||
-        window.innerWidth - (showThumbs ? thumbsW : 0) - (showAi ? 360 : 34)
+        window.innerWidth -
+          (showThumbs ? thumbsW : 0) -
+          (getOfficeHost().kind === 'web' ? 0 : showAi ? 360 : 34)
       const viewportH = el?.clientHeight || stageViewportSize.h || window.innerHeight - 150
       const availW = viewportW - 56
       // -72: vertical padding is 48 (AI-bar headroom) + 32, minus the same 8px slack as width
@@ -863,7 +866,7 @@ export function App() {
       setSelectedSlides([0])
       setSelectedIds([])
       setEditing(null)
-      setDirty(false)
+      setDirty(getOfficeHost().kind === 'web' ? !!getOfficeHost().draftDirty?.() : false)
       setInkTool('select')
       setUngroupedSets([])
       setAiPanelKey((k) => k + 1)
@@ -880,7 +883,9 @@ export function App() {
           : t('appStatusNewBlank'),
       )
       // Fetch the layout list asynchronously (doesn't block opening)
-      void window.slidesApi.getLayouts().then((r) => setLayoutsResult(r))
+      void getOfficeHost()
+        .getLayouts()
+        .then((r) => setLayoutsResult(r))
     },
     [fitZoom],
   )
@@ -920,7 +925,7 @@ export function App() {
   )
 
   const openDialog = useCallback(async () => {
-    const r = await window.slidesApi.openPptx(FIT_WIDTH)
+    const r = await getOfficeHost().openPptx(FIT_WIDTH)
     applyOpen(r)
   }, [applyOpen])
 
@@ -935,31 +940,52 @@ export function App() {
     [],
   )
 
+  useEffect(() => {
+    getOfficeHost().bindPresentation?.({
+      flush: async () => {
+        await fileActions.flushActiveEdit(ctxRef.current)
+        await ctxRef.current.flushNotes()
+      },
+      save: () => save(),
+      selection: () => ({
+        slideIndex: ctxRef.current.current,
+        sourceIds: [...ctxRef.current.selectedIds],
+      }),
+      apply: (state) => {
+        setSlides(state.slides)
+        setCurrent((value) => Math.min(value, Math.max(0, state.slides.length - 1)))
+        setDirty(state.dirty)
+      },
+    })
+  }, [save])
+
   // Close guard (closing tab/window) chose "Save": run the full save flow and report the result
   useEffect(() => {
-    return window.slidesApi.onCloseSaveRequest?.(() => {
+    return getOfficeHost().onCloseSaveRequest?.(() => {
       void save().then(
-        (ok) => window.slidesApi.reportCloseSaveResult(ok),
-        () => window.slidesApi.reportCloseSaveResult(false),
+        (ok) => getOfficeHost().reportCloseSaveResult(ok),
+        () => getOfficeHost().reportCloseSaveResult(false),
       )
     })
   }, [save])
 
   // Undo/redo stack occupancy pushed by the main process: the QAT buttons grey out when empty
   const [histState, setHistState] = useState({ canUndo: false, canRedo: false })
-  useEffect(() => window.slidesApi.onHistoryChanged?.(setHistState), [])
+  useEffect(() => getOfficeHost().onHistoryChanged?.(setHistState), [])
 
   // Shared session (a second window on the same file): apply the other window's
   // edits without touching local selection or an open editor — the ids are stable,
   // so the selection stays valid; a same-element conflict resolves last-write-wins.
   useEffect(
     () =>
-      window.slidesApi.onDeckChanged?.(({ slides: all }) => {
+      getOfficeHost().onDeckChanged?.(({ slides: all }) => {
         setSlides(all)
         setCurrent((c) => Math.min(c, Math.max(0, all.length - 1)))
         // The broadcast also fires for undo back to a clean state — ask the
         // session instead of assuming the change dirtied it
-        void window.slidesApi.isDirty?.().then((d) => setDirty(!!d))
+        void getOfficeHost()
+          .isDirty?.()
+          .then((d) => setDirty(!!d))
       }),
     [],
   )
@@ -986,13 +1012,15 @@ export function App() {
     let saving = false
     const tick = () => {
       if (saving || editing || editingCell || mouseDownRef.current) return
-      void window.slidesApi.isDirty().then((d) => {
-        if (!d || saving) return
-        saving = true
-        void save(true).finally(() => {
-          saving = false
+      void getOfficeHost()
+        .isDirty()
+        .then((d) => {
+          if (!d || saving) return
+          saving = true
+          void save(true).finally(() => {
+            saving = false
+          })
         })
-      })
     }
     const id = window.setInterval(tick, 30_000)
     window.addEventListener('blur', tick)
@@ -1014,7 +1042,7 @@ export function App() {
     if (headlessExportStartedRef.current) return
     headlessExportStartedRef.current = true
     void (async () => {
-      const outPath = await window.slidesApi.consumeHeadlessExport()
+      const outPath = await getOfficeHost().consumeHeadlessExport()
       if (!outPath) return
       const report = await runHeadlessPdfExport(
         outPath,
@@ -1032,7 +1060,7 @@ export function App() {
         },
         (target) => fileActions.exportPdf(ctxRef.current, target),
       )
-      window.slidesApi.headlessExportDone(report)
+      getOfficeHost().headlessExportDone(report)
     })()
   }, [])
 
@@ -1062,7 +1090,7 @@ export function App() {
       setPasteFloater(null) // The paste the floater refers to may have just been undone
       notesDraftRef.current = null // Undo overrides the unsaved draft, avoiding writing an old draft back
       setAnnotationsNonce((n) => n + 1) // Notes/comments aren't in RenderSlide; re-fetch
-      void window.slidesApi.isDirty().then(setDirty)
+      void getOfficeHost().isDirty().then(setDirty)
     },
     [],
   )
@@ -1075,7 +1103,7 @@ export function App() {
       return
     }
     const { current, slide } = ctxRef.current
-    applyHistoryResult(await window.slidesApi.undo(), current, slide?.partPath)
+    applyHistoryResult(await getOfficeHost().undo(), current, slide?.partPath)
   }, [editing, applyHistoryResult])
 
   const redo = useCallback(async () => {
@@ -1085,7 +1113,7 @@ export function App() {
       return
     }
     const { current, slide } = ctxRef.current
-    applyHistoryResult(await window.slidesApi.redo(), current, slide?.partPath)
+    applyHistoryResult(await getOfficeHost().redo(), current, slide?.partPath)
   }, [editing, applyHistoryResult])
 
   // Global shortcuts (keyboard-actions.ts): the handler reads the latest state via ctxRef, so attach once
@@ -1221,7 +1249,7 @@ export function App() {
   }, [hasDoc, viewMode, previewZoom, slides.length])
 
   const newBlank = useCallback(async () => {
-    const r = await window.slidesApi.newBlank(FIT_WIDTH)
+    const r = await getOfficeHost().newBlank(FIT_WIDTH)
     applyOpen(r)
     return r
   }, [applyOpen])
@@ -1240,8 +1268,8 @@ export function App() {
           showToast(err instanceof Error ? err.message : String(err), 'error')
         })
       })
-    const off = window.slidesApi.onOpened((r) => applyOpen(r))
-    consumePendingRef.current ??= window.slidesApi.consumePendingOpen(FIT_WIDTH)
+    const off = getOfficeHost().onOpened((r) => applyOpen(r))
+    consumePendingRef.current ??= getOfficeHost().consumePendingOpen(FIT_WIDTH)
     void consumePendingRef.current
       .then((r) => {
         if (bootHandledRef.current) return
@@ -1250,9 +1278,14 @@ export function App() {
         else void bootBlank()
       })
       // Open failures (corrupt file etc.) also land on a blank deck, or it stays at "Opening…" forever
-      .catch(() => {
+      .catch((error) => {
         if (bootHandledRef.current) return
         bootHandledRef.current = true
+        if (getOfficeHost().kind === 'web') {
+          showToast(error instanceof Error ? error.message : String(error), 'error')
+          setStatus('演示文稿无法打开，请保留当前页面后重试。')
+          return
+        }
         void bootBlank()
       })
     return off
@@ -1263,25 +1296,29 @@ export function App() {
   // whether it is still dirty rather than assuming
   useEffect(
     () =>
-      window.slidesApi.onRenamed((p) => {
+      getOfficeHost().onRenamed((p) => {
         setPath(p)
-        void window.slidesApi.isDirty().then(setDirty)
+        void getOfficeHost().isDirty().then(setDirty)
       }),
     [],
   )
 
   useEffect(() => {
-    const loadSettings = () => void window.slidesApi.getAiSettings().then(setAiSettings)
+    const loadSettings = () => void getOfficeHost().getAiSettings().then(setAiSettings)
     loadSettings()
-    return window.slidesApi.onAiSettingsChanged?.(loadSettings)
+    return getOfficeHost().onAiSettingsChanged?.(loadSettings)
   }, [])
 
   // Recent files for the start screen
   useEffect(() => {
-    if (slides.length === 0) void window.slidesApi.getRecentFiles().then(setRecent)
+    if (slides.length === 0) void getOfficeHost().getRecentFiles().then(setRecent)
   }, [slides.length])
 
   const toggleAi = useCallback(() => {
+    if (getOfficeHost().kind === 'web') {
+      getOfficeHost().openAgent?.()
+      return
+    }
     setShowAi((v) => {
       rememberAiPanelOpen('ai-slides-show-ai', !v)
       return !v
@@ -1297,6 +1334,10 @@ export function App() {
       slideShot?: boolean,
       scope?: AiScopeQuoteData,
     ) => {
+      if (getOfficeHost().kind === 'web') {
+        getOfficeHost().openAgent?.(text)
+        return
+      }
       setShowAi(() => {
         rememberAiPanelOpen('ai-slides-show-ai', true)
         return true
@@ -1418,6 +1459,10 @@ export function App() {
       const state = askState
       setAskState(null)
       if (!state) return
+      if (getOfficeHost().kind === 'web') {
+        getOfficeHost().openAgent?.(instruction)
+        return
+      }
       setEditQueue((prev) => {
         if (state.itemKey) {
           return prev.map((it) => (it.key === state.itemKey ? { ...it, instruction } : it))
@@ -1480,7 +1525,7 @@ export function App() {
         return
       }
       effectsInFlight.current = true
-      void window.slidesApi
+      void getOfficeHost()
         .setEffects({ slideIndex, sourceId: id, effects })
         .then((r) => r && applySlide(slideIndex, r))
         .finally(() => {
@@ -1549,7 +1594,7 @@ export function App() {
       return
     }
     const index = notesDraftIndex(draft, all)
-    void (index < 0 ? Promise.resolve('') : window.slidesApi.getNotes(index)).then((stored) => {
+    void (index < 0 ? Promise.resolve('') : getOfficeHost().getNotes(index)).then((stored) => {
       const kept = retargetNotesDraft(draft, all, stored)
       const typedSince = notesDraftRef.current
       if (kept && (!typedSince || typedSince.index === draft.index)) {
@@ -1705,7 +1750,7 @@ export function App() {
   // Reflect the current page's transition effect on page/document changes
   useEffect(() => {
     if (!hasDoc) return
-    void window.slidesApi.getTransition(current).then(setTransition)
+    void getOfficeHost().getTransition(current).then(setTransition)
   }, [hasDoc, current, path])
 
   const applyTransition = useCallback(
@@ -1734,9 +1779,11 @@ export function App() {
       return
     }
     let cancelled = false
-    void window.slidesApi.getAnimations(current).then((items) => {
-      if (!cancelled) setAnimations(items)
-    })
+    void getOfficeHost()
+      .getAnimations(current)
+      .then((items) => {
+        if (!cancelled) setAnimations(items)
+      })
     return () => {
       cancelled = true
     }
@@ -1959,7 +2006,7 @@ export function App() {
     if (!hasDoc) return
     let cancelled = false
     void flushNotes()
-      .then(() => window.slidesApi.getNotes(current))
+      .then(() => getOfficeHost().getNotes(current))
       .then((t) => {
         if (cancelled) return
         notesLoadedRef.current = { index: current, text: t }
@@ -1991,9 +2038,11 @@ export function App() {
       return
     }
     let cancelled = false
-    void window.slidesApi.getComments(current).then((c) => {
-      if (!cancelled) setComments(c)
-    })
+    void getOfficeHost()
+      .getComments(current)
+      .then((c) => {
+        if (!cancelled) setComments(c)
+      })
     return () => {
       cancelled = true
     }
@@ -2001,7 +2050,7 @@ export function App() {
 
   const addComment = useCallback(
     async (text: string) => {
-      const r = await window.slidesApi.addComment({ slideIndex: current, text })
+      const r = await getOfficeHost().addComment({ slideIndex: current, text })
       if (r) {
         setComments(r)
         setDirty(true)
@@ -2013,7 +2062,7 @@ export function App() {
 
   const deleteComment = useCallback(
     async (c: SlideComment) => {
-      const r = await window.slidesApi.deleteComment({
+      const r = await getOfficeHost().deleteComment({
         slideIndex: current,
         authorId: c.authorId,
         idx: c.idx,
@@ -2049,19 +2098,19 @@ export function App() {
     setEditingCell(null)
     setSelectedIds([])
     setCtxMenu(null)
-    const r = await window.slidesApi.masterEnter(FIT_WIDTH)
+    const r = await getOfficeHost().masterEnter(FIT_WIDTH)
     if (r?.items.length) setMasterItems(r.items)
   }, [hasDoc])
 
   const closeMasterView = useCallback(async () => {
-    const all = await window.slidesApi.masterClose()
+    const all = await getOfficeHost().masterClose()
     setMasterItems(null)
     if (all) {
       // The inheritance chain changed: replace the whole render tree (all-new element ids)
       setSlides(all)
       setSelectedIds([])
     }
-    void window.slidesApi.isDirty().then(setDirty)
+    void getOfficeHost().isDirty().then(setDirty)
   }, [])
 
   const zoomToFit = useCallback(() => {
@@ -2113,9 +2162,11 @@ export function App() {
       return
     }
     let alive = true
-    void window.slidesApi.getSections().then((r) => {
-      if (alive) setSections(r ?? [])
-    })
+    void getOfficeHost()
+      .getSections()
+      .then((r) => {
+        if (alive) setSections(r ?? [])
+      })
     return () => {
       alive = false
     }
@@ -2157,7 +2208,7 @@ export function App() {
       setSelectedIds([])
       setEditing(null)
     }
-    void window.slidesApi.hasSlideClipboard().then(setCanPasteSlide)
+    void getOfficeHost().hasSlideClipboard().then(setCanPasteSlide)
     setCtxMenu({ kind: 'thumb', x: e.clientX, y: e.clientY, index: i })
   }
 
@@ -2230,7 +2281,7 @@ export function App() {
       if (after) pos = i
     }
     if (pos < 0) pos = last + 1
-    void window.slidesApi.hasSlideClipboard().then(setCanPasteSlide)
+    void getOfficeHost().hasSlideClipboard().then(setCanPasteSlide)
     setCtxMenu({ kind: 'gap', x: e.clientX, y: e.clientY, pos })
   }
   const commitRenameSection = useCallback(
@@ -2269,7 +2320,7 @@ export function App() {
     (sourceId: string | null, x: number, y: number, cell?: { row: number; col: number }) => {
       if (editing) return
       // The clipboard may have been filled from another window (or externally) since our last copy
-      void window.slidesApi.clipboardProbe().then(setHasClipboard)
+      void getOfficeHost().clipboardProbe().then(setHasClipboard)
       if (sourceId) {
         setSelectedIds((prev) => (prev.includes(sourceId) ? prev : [sourceId]))
         setCtxMenu({ kind: 'element', x, y, targetId: sourceId, ...(cell ? { cell } : {}) })
@@ -2282,13 +2333,13 @@ export function App() {
   )
 
   const onTextContextMenu = useCallback((x: number, y: number, collapsed: boolean) => {
-    void window.slidesApi.clipboardProbe().then(setHasClipboard)
+    void getOfficeHost().clipboardProbe().then(setHasClipboard)
     setCtxMenu({ kind: 'text', x, y, collapsed })
   }, [])
 
   // Menu commands. Cut/copy/paste dispatch by context: text mode goes back to the native clipboard, canvas mode uses the element clipboard
   useEffect(() => {
-    return window.slidesApi.onMenuCommand((cmd) => {
+    return getOfficeHost().onMenuCommand((cmd) => {
       // Master view: only allow save (undo/clipboard etc. target normal pages, not applicable inside the master)
       if (masterItems) {
         if (cmd === 'save') void save()
@@ -2309,14 +2360,14 @@ export function App() {
       else if (cmd === 'redo') void redo()
       else if (cmd === 'cut') {
         if (editing || inTextField() || hasDomTextSelection())
-          void window.slidesApi.nativeClipboard('cut')
+          void getOfficeHost().nativeClipboard('cut')
         else void cutSelected()
       } else if (cmd === 'copy') {
         if (editing || inTextField() || hasDomTextSelection())
-          void window.slidesApi.nativeClipboard('copy')
+          void getOfficeHost().nativeClipboard('copy')
         else void copySelected()
       } else if (cmd === 'paste') {
-        if (editing || inTextField()) void window.slidesApi.nativeClipboard('paste')
+        if (editing || inTextField()) void getOfficeHost().nativeClipboard('paste')
         else void pasteClipboard()
       }
     })
@@ -2431,7 +2482,7 @@ export function App() {
   useEffect(() => setMediaPlay(null), [current])
   const startMediaPlayback = useCallback(
     async (sourceId: string) => {
-      const r = await window.slidesApi.getMediaData(current, sourceId)
+      const r = await getOfficeHost().getMediaData(current, sourceId)
       if (r) setMediaPlay({ sourceId, ...r })
     },
     [current],
@@ -2505,7 +2556,7 @@ export function App() {
   // PowerPoint drops a click-to-type text box the user leaves without typing
   const discardEmptyTextBox = useCallback(async () => {
     if (!editing) return
-    const updated = await window.slidesApi.deleteElement({
+    const updated = await getOfficeHost().deleteElement({
       slideIndex: current,
       sourceId: editing.sourceId,
     })
@@ -2518,7 +2569,7 @@ export function App() {
     async (paragraphs: EditParagraph[]) => {
       if (!editing) return
       if (editing.discardIfEmpty && paragraphsBlank(paragraphs)) return discardEmptyTextBox()
-      const updated = await window.slidesApi.editText({
+      const updated = await getOfficeHost().editText({
         slideIndex: current,
         sourceId: editing.sourceId,
         paragraphs,
@@ -2569,7 +2620,7 @@ export function App() {
       preview?: boolean,
       groupId?: string,
     ) => {
-      const updated = await window.slidesApi.editTransform({
+      const updated = await getOfficeHost().editTransform({
         slideIndex: current,
         sourceId,
         xPx: box.x,
@@ -2597,7 +2648,7 @@ export function App() {
         box: { x: number; y: number; w: number; h: number; rotationDeg: number }
       }>,
     ) => {
-      const updated = await window.slidesApi.editTransformMulti({
+      const updated = await getOfficeHost().editTransformMulti({
         slideIndex: current,
         fitWidthPx: FIT_WIDTH,
         items: items.map((it) => ({
@@ -2619,10 +2670,10 @@ export function App() {
   )
 
   const onTransformCancel = useCallback(async () => {
-    const updated = await window.slidesApi.cancelTransformPreview({ slideIndex: current })
+    const updated = await getOfficeHost().cancelTransformPreview({ slideIndex: current })
     if (updated) setSlides((s) => s.map((sl, i) => (i === current ? updated : sl)))
     // Preview frames marked the deck dirty; the rollback may have made it clean again
-    void window.slidesApi.isDirty().then(setDirty)
+    void getOfficeHost().isDirty().then(setDirty)
   }, [current])
 
   // Yellow adjust-handle drag: throttled preview commits keep the geometry live,
@@ -2633,7 +2684,7 @@ export function App() {
       const now = performance.now()
       if (preview && now - adjustLastSent.current < 80) return
       adjustLastSent.current = now
-      void window.slidesApi
+      void getOfficeHost()
         .setShapeAdjust({
           slideIndex: current,
           sourceId,
@@ -2656,7 +2707,7 @@ export function App() {
   const sendEditPoints = useCallback((commit: EditPointsCommit, preview: boolean) => {
     editPointsPreview.current.note(commit, preview)
     const { slideIndex } = commit
-    void window.slidesApi
+    void getOfficeHost()
       .setShapeGeometry({
         slideIndex,
         sourceId: commit.sourceId,
@@ -2713,7 +2764,7 @@ export function App() {
         end?: { targetId: string; idx: number } | null
       },
     ) => {
-      const updated = await window.slidesApi.editConnectorEndpoints({
+      const updated = await getOfficeHost().editConnectorEndpoints({
         slideIndex: current,
         sourceId,
         x1Px: ep.x1,
@@ -2829,7 +2880,7 @@ export function App() {
   )
 
   const [selectedChartData, setSelectedChartData] = useState<Awaited<
-    ReturnType<typeof window.slidesApi.getChartData>
+    ReturnType<OfficeHost['getChartData']>
   > | null>(null)
   useEffect(() => {
     if (selectedNode?.type !== 'chart') {
@@ -2837,9 +2888,11 @@ export function App() {
       return
     }
     let alive = true
-    void window.slidesApi.getChartData(current, selectedNode.sourceId).then((d) => {
-      if (alive) setSelectedChartData(d)
-    })
+    void getOfficeHost()
+      .getChartData(current, selectedNode.sourceId)
+      .then((d) => {
+        if (alive) setSelectedChartData(d)
+      })
     return () => {
       alive = false
     }
@@ -2924,9 +2977,11 @@ export function App() {
     if (selectedNode?.type !== 'chart') return
     let stale = false
     // Optional call: degrade to the fixed palette when the preload build is too old, no blank screen
-    void window.slidesApi.getChartColorSchemes?.().then((r) => {
-      if (!stale && r) setChartColorSchemes(r)
-    })
+    void getOfficeHost()
+      .getChartColorSchemes?.()
+      .then((r) => {
+        if (!stale && r) setChartColorSchemes(r)
+      })
     return () => {
       stale = true
     }
@@ -3294,15 +3349,17 @@ export function App() {
         }
         onResetLayout={() => void slideActions.setSlideLayoutAt(ctxRef.current, current)}
         onSlideSize={(cx, cy) =>
-          void window.slidesApi.setSlideSize({ cx, cy }).then((all) => {
-            if (all) {
-              setSlides(all)
-              // Every slide re-materializes with fresh element ids
-              setSelectedIds([])
-              setEditing(null)
-              setDirty(true)
-            }
-          })
+          void getOfficeHost()
+            .setSlideSize({ cx, cy })
+            .then((all) => {
+              if (all) {
+                setSlides(all)
+                // Every slide re-materializes with fresh element ids
+                setSelectedIds([])
+                setEditing(null)
+                setDirty(true)
+              }
+            })
         }
         slideSizeKey={
           slide
@@ -3409,7 +3466,7 @@ export function App() {
             } else if (n.type === 'group') {
               for (const c of (n as GroupRenderNode).children) {
                 if (c.type === 'picture' || c.type === 'shape')
-                  void window.slidesApi
+                  void getOfficeHost()
                     .editStroke({
                       slideIndex: current,
                       sourceId: c.sourceId,
@@ -3424,7 +3481,7 @@ export function App() {
         onChangeShape={
           selectedNode?.type === 'shape' && !selectedNode.line
             ? (prst) => {
-                void window.slidesApi
+                void getOfficeHost()
                   .changeShape({
                     slideIndex: current,
                     sourceId: selectedNode.sourceId,
@@ -3444,14 +3501,14 @@ export function App() {
               const st = shape.stroke
               const stroke = { color: s.stroke, widthPt: st?.widthPt ?? 1, dash: s.dash ?? 'solid' }
               if (groupId) {
-                const r1 = await window.slidesApi.editFill({
+                const r1 = await getOfficeHost().editFill({
                   slideIndex: current,
                   sourceId: shape.sourceId,
                   fill: s.fill,
                   groupId,
                 })
                 if (r1) applySlide(current, r1)
-                const r2 = await window.slidesApi.editStroke({
+                const r2 = await getOfficeHost().editStroke({
                   slideIndex: current,
                   sourceId: shape.sourceId,
                   stroke,
@@ -3484,7 +3541,7 @@ export function App() {
               } else if (n?.type === 'group') {
                 for (const c of (n as GroupRenderNode).children) {
                   if (c.type !== 'shape') continue
-                  const r = await window.slidesApi.editFill({
+                  const r = await getOfficeHost().editFill({
                     slideIndex: current,
                     sourceId: c.sourceId,
                     fill,
@@ -3511,7 +3568,7 @@ export function App() {
               }
             }
             if (targets.length === 0) return
-            const r = await window.slidesApi.editImageFill({
+            const r = await getOfficeHost().editImageFill({
               slideIndex: current,
               targets,
               mode,
@@ -3538,7 +3595,7 @@ export function App() {
         onPictureRotate={(delta) => void rotateSelected(delta)}
         onPictureOpacity={(opacity) => {
           if (!selectedNode || selectedNode.type !== 'picture') return
-          void window.slidesApi
+          void getOfficeHost()
             .editPictureOpacity({ slideIndex: current, sourceId: selectedNode.sourceId, opacity })
             .then((r) => r && applySlide(current, r))
         }}
@@ -3553,57 +3610,62 @@ export function App() {
       />
 
       <div className="app-main">
-        {slide && viewMode !== 'reading' && viewMode !== 'sorter' && (
-          <div className={`ai-dock${showAi && aiSettings ? '' : ' collapsed'}`}>
-            {/* always mounted once settings load: collapse must not drop state or in-flight runs */}
-            {aiSettings ? (
-              <AiPanel
-                key={aiPanelKey}
-                slides={slides}
-                current={current}
-                selectedIds={selectedIds}
-                deckEmpty={deckEmpty}
-                images={images}
-                applySlide={applySlide}
-                applyDeck={applyDeck}
-                fitWidthPx={FIT_WIDTH}
-                settings={aiSettings}
-                preset={aiPreset}
-                open={showAi}
-                onExpand={toggleAi}
-                onCollapse={toggleAi}
-                onUndo={() => void undo()}
-                onPathChange={(p) => {
-                  setPath(p)
-                  setDirty(false)
-                }}
-                onBeforeRun={flushNotes}
-                currentFilePath={path}
-                editQueue={editQueue}
-                onQueueEditInstruction={(key, instruction) =>
-                  setEditQueue((prev) =>
-                    prev.map((it) => (it.key === key ? { ...it, instruction } : it)),
-                  )
-                }
-                onQueueRemove={(key) => setEditQueue((prev) => prev.filter((it) => it.key !== key))}
-                onQueueClear={() => setEditQueue([])}
-                onQueueFocus={focusQueueItem}
-                onQueueConsume={(keys) =>
-                  setEditQueue((prev) => prev.filter((it) => !keys.includes(it.key)))
-                }
-              />
-            ) : (
-              <button
-                className="ai-rail"
-                onClick={toggleAi}
-                data-tip={t('appAiRailExpand')}
-                aria-label={t('appAiRailExpand')}
-              >
-                <GensparkMark size={22} />
-              </button>
-            )}
-          </div>
-        )}
+        {getOfficeHost().kind !== 'web' &&
+          slide &&
+          viewMode !== 'reading' &&
+          viewMode !== 'sorter' && (
+            <div className={`ai-dock${showAi && aiSettings ? '' : ' collapsed'}`}>
+              {/* always mounted once settings load: collapse must not drop state or in-flight runs */}
+              {aiSettings ? (
+                <AiPanel
+                  key={aiPanelKey}
+                  slides={slides}
+                  current={current}
+                  selectedIds={selectedIds}
+                  deckEmpty={deckEmpty}
+                  images={images}
+                  applySlide={applySlide}
+                  applyDeck={applyDeck}
+                  fitWidthPx={FIT_WIDTH}
+                  settings={aiSettings}
+                  preset={aiPreset}
+                  open={showAi}
+                  onExpand={toggleAi}
+                  onCollapse={toggleAi}
+                  onUndo={() => void undo()}
+                  onPathChange={(p) => {
+                    setPath(p)
+                    setDirty(false)
+                  }}
+                  onBeforeRun={flushNotes}
+                  currentFilePath={path}
+                  editQueue={editQueue}
+                  onQueueEditInstruction={(key, instruction) =>
+                    setEditQueue((prev) =>
+                      prev.map((it) => (it.key === key ? { ...it, instruction } : it)),
+                    )
+                  }
+                  onQueueRemove={(key) =>
+                    setEditQueue((prev) => prev.filter((it) => it.key !== key))
+                  }
+                  onQueueClear={() => setEditQueue([])}
+                  onQueueFocus={focusQueueItem}
+                  onQueueConsume={(keys) =>
+                    setEditQueue((prev) => prev.filter((it) => !keys.includes(it.key)))
+                  }
+                />
+              ) : (
+                <button
+                  className="ai-rail"
+                  onClick={toggleAi}
+                  data-tip={t('appAiRailExpand')}
+                  aria-label={t('appAiRailExpand')}
+                >
+                  <GensparkMark size={22} />
+                </button>
+              )}
+            </div>
+          )}
         <div className="app-content">
           {missingFonts.length > 0 && (
             <div className="font-missing-banner">
@@ -3943,7 +4005,9 @@ export function App() {
                               onClick={toggleAi}
                             >
                               <GensparkMark size={14} />
-                              <span>Genspark AI</span>
+                              <span>
+                                {getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}
+                              </span>
                             </button>
                             {/* Same one-click presets as the Home tab; hidden instead of
                         disabled while the deck has no real content */}
@@ -4355,7 +4419,7 @@ export function App() {
                     onSizeRequestDone={() => setFormatSizeNonce(0)}
                     onFill={(id, fill) => void onFill(id, fill)}
                     onImageFill={(id) =>
-                      void window.slidesApi
+                      void getOfficeHost()
                         .editImageFill({
                           slideIndex: current,
                           targets: [{ sourceId: id }],
@@ -4364,12 +4428,12 @@ export function App() {
                         .then((r) => r && applySlide(current, r))
                     }
                     onTextAnchor={(id, anchor) =>
-                      void window.slidesApi
+                      void getOfficeHost()
                         .setTextAnchor({ slideIndex: current, sourceId: id, anchor })
                         .then((r) => r && applySlide(current, r))
                     }
                     onTextBodyProps={(id, props) =>
-                      void window.slidesApi
+                      void getOfficeHost()
                         .setTextBodyProps({ slideIndex: current, sourceId: id, props })
                         .then((r) => r && applySlide(current, r))
                     }
@@ -4652,7 +4716,7 @@ export function App() {
           y={shapeGalleryAt.y}
           onPick={(prst) => {
             const { targetId } = shapeGalleryAt
-            void window.slidesApi
+            void getOfficeHost()
               .changeShape({
                 slideIndex: current,
                 sourceId: targetId,

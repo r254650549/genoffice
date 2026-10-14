@@ -16,6 +16,18 @@ import { tiffToPng } from './tiff-decode'
 import { neutralizeJpegOrientation } from './jpeg-orientation'
 import { displayMime } from './media-mime'
 
+export function deckDefaultFont(opened: OpenedPptx): string | undefined {
+  try {
+    const slidePath = opened.archive.readPresentation().slidePaths[0]
+    if (!slidePath) return undefined
+    const themePath = opened.archive.resolveSlideChain(slidePath).themePath
+    const xml = themePath ? opened.archive.readText(themePath) : undefined
+    return xml ? parseTheme(xml).minorFont : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export interface Session {
   path: string
   opened: OpenedPptx

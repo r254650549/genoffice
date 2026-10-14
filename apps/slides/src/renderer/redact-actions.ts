@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Withholding content from the model, for the two things a reader can withhold.
  *
@@ -86,7 +87,7 @@ async function applyElementRedaction(
   sourceId: string,
   label: string | null,
 ): Promise<void> {
-  const result = await window.slidesApi.applyTxn({
+  const result = await getOfficeHost().applyTxn({
     ops: [{ op: 'setRedaction', target: { slide: ctx.current, el: sourceId }, label }],
   })
   if (!result?.applied) {

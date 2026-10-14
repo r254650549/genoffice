@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -123,6 +124,7 @@ function installSlidesApi(): void {
       aiLogRunFailure: vi.fn(async () => undefined),
     },
   })
+  configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 }
 
 beforeAll(() => {

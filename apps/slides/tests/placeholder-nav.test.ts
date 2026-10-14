@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RenderNode, RenderSlide } from '@genoffice/pptx-render'
 import {
@@ -96,6 +97,7 @@ describe('nextPlaceholder', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(window as unknown as { slidesApi: typeof api }).slidesApi = api
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
   })
 
   it('commits changed text, then enters the next placeholder', async () => {

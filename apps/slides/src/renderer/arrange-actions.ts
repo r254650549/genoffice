@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Element arrangement actions extracted from App.tsx: grouping,
  * ungrouping, align/distribute, z-order, and freehand ink. Functions read the
@@ -19,7 +20,7 @@ export async function groupSelected(ctx: ActionCtx): Promise<void> {
     .map((id) => slide.nodes.find((n) => n.sourceId === id))
     .filter(Boolean) as RenderNode[]
   if (nodes.some((n) => !GROUPABLE.has(n.type))) return
-  const result = await window.slidesApi.groupElements({
+  const result = await getOfficeHost().groupElements({
     slideIndex: current,
     sourceIds: selectedIds,
   })
@@ -39,7 +40,7 @@ export async function ungroupSelected(ctx: ActionCtx): Promise<void> {
   if (!node || node.type !== 'group') return
   const groupNode = node as GroupRenderNode
   const childIds = groupNode.children.map((c) => c.sourceId)
-  const updated = await window.slidesApi.ungroupElement({
+  const updated = await getOfficeHost().ungroupElement({
     slideIndex: current,
     sourceId: id,
   })
@@ -88,7 +89,7 @@ export async function regroupSelected(ctx: ActionCtx): Promise<void> {
   if (!slide) return
   const memberIds = regroupCandidates(ctx.ungroupedSets, slide, selectedIds)
   if (!memberIds) return
-  const result = await window.slidesApi.groupElements({
+  const result = await getOfficeHost().groupElements({
     slideIndex: current,
     sourceIds: memberIds,
   })
@@ -196,7 +197,7 @@ export async function alignSelected(ctx: ActionCtx, op: AlignOp): Promise<void> 
     rotationDeg: n.box.rotationDeg,
   }))
 
-  const updated = await window.slidesApi.batchEditTransform({
+  const updated = await getOfficeHost().batchEditTransform({
     slideIndex: current,
     fitWidthPx: FIT_WIDTH,
     items,
@@ -212,7 +213,7 @@ export async function reorderSelected(
   sourceId: string,
   dir: ReorderDirection,
 ): Promise<void> {
-  const updated = await window.slidesApi.reorderElement({
+  const updated = await getOfficeHost().reorderElement({
     slideIndex: ctx.current,
     sourceId,
     dir,
@@ -225,7 +226,7 @@ export async function reorderSelected(
 export async function commitInk(ctx: ActionCtx, stroke: InkStroke): Promise<void> {
   if (!ctx.slide) return
   const raster = rasterizeStroke(stroke)
-  const r = await window.slidesApi.addInk({
+  const r = await getOfficeHost().addInk({
     slideIndex: ctx.current,
     base64: raster.base64,
     xPx: raster.xPx,
@@ -246,7 +247,7 @@ export async function commitInk(ctx: ActionCtx, stroke: InkStroke): Promise<void
 export async function flipSelected(ctx: ActionCtx, axis: 'h' | 'v'): Promise<void> {
   if (ctx.selectedIds.length === 0) return
   const groupId = ctx.groupIdOf(ctx.selectedIds[0]!)
-  const updated = await window.slidesApi.flipElements({
+  const updated = await getOfficeHost().flipElements({
     slideIndex: ctx.current,
     sourceIds: ctx.selectedIds,
     axis,
@@ -309,7 +310,7 @@ export async function rotateSelected(ctx: ActionCtx, deltaDeg: number): Promise<
   // elements keep the legacy batch semantics, in-group children go through the
   // editTransform-equivalent multi path (group-local boxes)
   const updated = items.every((it) => !it.groupId)
-    ? await window.slidesApi.batchEditTransform({
+    ? await getOfficeHost().batchEditTransform({
         slideIndex: ctx.current,
         fitWidthPx: FIT_WIDTH,
         items: items.map((it) => ({
@@ -321,7 +322,7 @@ export async function rotateSelected(ctx: ActionCtx, deltaDeg: number): Promise<
           rotationDeg: it.box.rotationDeg,
         })),
       })
-    : await window.slidesApi.editTransformMulti({
+    : await getOfficeHost().editTransformMulti({
         slideIndex: ctx.current,
         fitWidthPx: FIT_WIDTH,
         items: items.map((it) => ({
@@ -342,7 +343,7 @@ export async function rotateSelected(ctx: ActionCtx, deltaDeg: number): Promise<
 
 export async function eraseInk(ctx: ActionCtx, sourceIds: string[]): Promise<void> {
   if (!sourceIds.length) return
-  const updated = await window.slidesApi.deleteElements({ slideIndex: ctx.current, sourceIds })
+  const updated = await getOfficeHost().deleteElements({ slideIndex: ctx.current, sourceIds })
   if (updated) ctx.applySlide(ctx.current, updated)
 }
 

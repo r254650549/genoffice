@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './../office-host'
 /** Home tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import { useState } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
@@ -215,7 +216,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
     onParagraphFormat({ startAt: n })
   }
   const pickBulletPicture = async () => {
-    const picked = await window.slidesApi.pickPictureFile()
+    const picked = await getOfficeHost().pickPictureFile()
     if (picked) onParagraphFormat({ bullet: 'blip', bulletImage: picked })
   }
   const draftKeys = (commit: () => void) => (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -229,7 +230,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
   }
   return (
     <>
-      <Group label="Genspark AI">
+      <Group label={getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}>
         <button
           className={`rb-big ai-entry${aiOpen ? ' active' : ''}`}
           data-tip={t('aiOpenAssistant')}
@@ -238,7 +239,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
           <span className="rb-big-icon">
             <GensparkMark size={26} />
           </span>
-          <span>Genspark AI</span>
+          <span>{getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}</span>
         </button>
         <button
           className="rb-big ai-entry"

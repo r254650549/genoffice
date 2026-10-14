@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Context-menu item builder extracted from App.tsx. Builds the
  * thumbnail/section/canvas/element menus from the latest App state (ActionCtx);
@@ -227,7 +228,7 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
       fn()
     }
     const native = (op: 'cut' | 'copy' | 'paste') =>
-      onSel(() => void window.slidesApi.nativeClipboard(op))
+      onSel(() => void getOfficeHost().nativeClipboard(op))
     const editedId = ctx.editing?.sourceId ?? ctx.editingCell?.sourceId
     return [
       { label: t('appCtxCut'), hint: '⌘X', disabled: ctxMenu.collapsed, onClick: native('cut') },
@@ -357,7 +358,7 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
         {
           label: t('appCtxCellAnchorTop'),
           onClick: () =>
-            void window.slidesApi
+            void getOfficeHost()
               .setTableCellAnchor({
                 slideIndex: current,
                 sourceId: ctxMenu.targetId,
@@ -370,7 +371,7 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
         {
           label: t('appCtxCellAnchorMiddle'),
           onClick: () =>
-            void window.slidesApi
+            void getOfficeHost()
               .setTableCellAnchor({
                 slideIndex: current,
                 sourceId: ctxMenu.targetId,
@@ -383,7 +384,7 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
         {
           label: t('appCtxCellAnchorBottom'),
           onClick: () =>
-            void window.slidesApi
+            void getOfficeHost()
               .setTableCellAnchor({
                 slideIndex: current,
                 sourceId: ctxMenu.targetId,
@@ -411,7 +412,7 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
           label: t('appCtxCellShading'),
           swatches: [...TABLE_SHADING_COLORS, 'none'],
           onSwatch: (c) =>
-            void window.slidesApi
+            void getOfficeHost()
               .editTableStyle({
                 slideIndex: current,
                 sourceId: ctxMenu.targetId,

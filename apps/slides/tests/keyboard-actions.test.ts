@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleGlobalKeydown } from '../src/renderer/keyboard-actions'
 import * as clipboardActions from '../src/renderer/clipboard-actions'
@@ -507,6 +508,7 @@ describe('arrow-key nudge', () => {
     document.body.innerHTML = ''
     api.editTransformMulti.mockResolvedValue({ nodes: [] })
     ;(window as unknown as { slidesApi: typeof api }).slidesApi = api
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
   })
 
   it('sends a multi-selection as one transform batch and applies the slide once', async () => {
@@ -784,6 +786,7 @@ describe('arrow-key nudging with a selection', () => {
     ;(
       window as unknown as { slidesApi: { editTransformMulti: typeof editTransformMulti } }
     ).slidesApi = { editTransformMulti }
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     handleGlobalKeydown(ctx, keydown('ArrowRight', { metaKey: false }))
     expect(onTransform).not.toHaveBeenCalled()
     expect(editTransformMulti).toHaveBeenCalledTimes(1)

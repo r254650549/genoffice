@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 /** Figure-provenance gate: chart data and data-dense briefs must declare dataSource; 'search' requires a real web_search first. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createSlidesSkill, type DeckAccess } from '../src/renderer/ai/slides-skill'
@@ -99,6 +100,7 @@ beforeEach(() => {
     editChart: vi.fn(async () => ({ slide: richDeck })),
     webSearch: vi.fn(async () => ({ answer: '', results: [] })),
   }
+  configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 })
 
 describe('apply_ops addChart provenance gate', () => {

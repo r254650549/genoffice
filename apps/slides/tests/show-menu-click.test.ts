@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 // Regression: choosing a slide show context-menu item must run that item only —
 // the click used to bubble into the show root and advance the slide as well.
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -33,6 +34,7 @@ const resolved =
   getMediaData: resolved(null),
   setShowFullScreen: resolved(undefined),
 }
+configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 
 const slides = [0, 1, 2].map(
   () => ({ widthPx: 960, heightPx: 540, nodes: [], hidden: false }) as unknown as RenderSlide,

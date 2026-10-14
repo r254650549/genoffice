@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 /** Hard guard against "building from scratch by hand": apply_ops insert ops (addElement/addSmartArt) on an empty deck are refused and redirected to generate_deck. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createSlidesSkill, type DeckAccess } from '../src/renderer/ai/slides-skill'
@@ -107,6 +108,7 @@ beforeEach(() => {
       slides: [richDeck],
     })),
   }
+  configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 })
 
 describe('anti hand-building from scratch', () => {

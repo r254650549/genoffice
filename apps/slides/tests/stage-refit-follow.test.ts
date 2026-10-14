@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 // Regression: the stage's fit-to-window follow (ResizeObserver on .stage-wrap)
 // must survive an editor remount — switching to reading/sorter view and back
 // replaces the .stage-wrap element, and the observer has to re-bind to the new
@@ -184,6 +185,7 @@ beforeAll(() => {
     },
   })
   ;(window as unknown as { slidesApi: unknown }).slidesApi = makeSlidesApi()
+  configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
 })
 
 afterEach(() => {

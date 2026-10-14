@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ActionCtx } from '../src/renderer/action-context'
 import type {
@@ -25,6 +26,7 @@ function setup(selectedIds: string[], boxes: Record<string, Box>, groupOf: Recor
     deleteElements: vi.fn(async (_op: DeleteElementsOp) => ({ nodes: [] })),
   }
   vi.stubGlobal('window', { slidesApi: api })
+  configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
   const ctx = {
     current: 1,
     selectedIds,
@@ -127,6 +129,7 @@ describe('regroup', () => {
       groupElements: vi.fn(async () => ({ slide: { nodes: [node('g')] }, groupId: 'g' })),
     }
     vi.stubGlobal('window', { slidesApi: api })
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const ctx = {
       current: 0,
       selectedIds: ['c'],
@@ -161,6 +164,7 @@ describe('regroup', () => {
       ungroupElement: vi.fn(async () => ({ partPath, nodes: [node('a'), node('b')] })),
     }
     vi.stubGlobal('window', { slidesApi: api })
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const ctx = {
       current: 1,
       selectedIds: ['g'],

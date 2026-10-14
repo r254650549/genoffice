@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * File actions extracted from App.tsx: save / save-as, image & PDF
  * export. Each function takes the ActionCtx built fresh per call.
@@ -93,7 +94,7 @@ export async function save(getCtx: () => ActionCtx, quiet = false): Promise<bool
     const ctx = getCtx()
     await flushActiveEdit(ctx)
     await ctx.flushNotes()
-    const r = await window.slidesApi.save()
+    const r = await getOfficeHost().save()
     if (r.ok) {
       if (r.slides) adoptSavedSlides(ctx, r.slides)
       if (r.path) ctx.setPath(r.path)
@@ -120,8 +121,12 @@ export async function saveAs(getCtx: () => ActionCtx): Promise<void> {
     await flushActiveEdit(ctx)
     await ctx.flushNotes()
     const name = baseName(ctx.path ?? '') || 'presentation.pptx'
-    const r = await window.slidesApi.saveAs(name)
+    const r = await getOfficeHost().saveAs(name)
     if (r.ok) {
+      if ((r as typeof r & { copied?: boolean }).copied) {
+        showToast('副本已下载')
+        return
+      }
       if (r.slides) adoptSavedSlides(ctx, r.slides)
       ctx.setPath(r.path ?? ctx.path)
       ctx.setDirty(false)
@@ -150,12 +155,12 @@ export async function exportImages(ctx: ActionCtx): Promise<void> {
     ctx.setStatus(t('appExportNoSlides'))
     return
   }
-  const dir = await window.slidesApi.pickExportDir()
+  const dir = await getOfficeHost().pickExportDir()
   if (!dir) return
   ctx.setStatus(t('appExportImagesProgress', { count: visible.length }))
   try {
     const pngs = await renderSlidesToPngBase64(visible, ctx.images)
-    const r = await window.slidesApi.exportImages({
+    const r = await getOfficeHost().exportImages({
       dir,
       baseName: exportBaseName(ctx),
       pngsBase64: pngs,
@@ -180,8 +185,8 @@ async function collectPdfLinks(ctx: ActionCtx): Promise<ExportPdfLink[][]> {
   const pageOfModelIndex = new Map(modelIndexes.map((mi, page) => [mi, page] as const))
   try {
     const [linkLists, runLinkLists] = await Promise.all([
-      Promise.all(modelIndexes.map((mi) => window.slidesApi.getSlideLinks(mi))),
-      Promise.all(modelIndexes.map((mi) => window.slidesApi.getRunLinks(mi))),
+      Promise.all(modelIndexes.map((mi) => getOfficeHost().getSlideLinks(mi))),
+      Promise.all(modelIndexes.map((mi) => getOfficeHost().getRunLinks(mi))),
     ])
     const visible = modelIndexes.map((mi) => ctx.slides[mi]!)
     return collectExportPdfLinks(visible, linkLists, runLinkLists, pageOfModelIndex)
@@ -204,13 +209,13 @@ export async function exportPdf(ctx: ActionCtx, outPath?: string): Promise<boole
     ctx.setStatus(t('appExportNoSlides'))
     return false
   }
-  const target = outPath ?? (await window.slidesApi.pickExportPdfPath(`${exportBaseName(ctx)}.pdf`))
+  const target = outPath ?? (await getOfficeHost().pickExportPdfPath(`${exportBaseName(ctx)}.pdf`))
   if (!target) return false
   ctx.setStatus(t('appExportPdfProgress'))
   try {
     const { pages, fontCss } = await renderSlidesToPdfPages(visible, ctx.images)
     const links = await collectPdfLinks(ctx)
-    const r = await window.slidesApi.exportPdf({
+    const r = await getOfficeHost().exportPdf({
       filePath: target,
       pages,
       widthPx: visible[0].widthPx,

@@ -1,3 +1,4 @@
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CopyElementsOp, DeleteElementsOp } from '../src/shared/ipc'
 import type { ActionCtx } from '../src/renderer/action-context'
@@ -19,6 +20,7 @@ function setup() {
     copyElementsImage: vi.fn(async () => true),
   }
   vi.stubGlobal('window', { slidesApi: api })
+  configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
   const ctx = {
     current: 0,
     selectedIds: ['a', 'b'],
@@ -84,6 +86,7 @@ describe('delete selected slide elements', () => {
       deleteElements: vi.fn(async (_op: DeleteElementsOp) => ({ nodes: [] })),
     }
     vi.stubGlobal('window', { slidesApi: api })
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const ctx = {
       current: 3,
       selectedIds,

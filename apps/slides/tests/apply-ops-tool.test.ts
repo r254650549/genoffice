@@ -1,5 +1,6 @@
 /** apply_ops — the AI batch surface over the op transaction executor. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { configureOfficeHost, type OfficeHost } from '../src/renderer/office-host'
 import type { RenderSlide, ShapeRenderNode } from '@genoffice/pptx-render'
 import { createSlidesSkill, type DeckAccess } from '../src/renderer/ai/slides-skill'
 
@@ -87,6 +88,7 @@ beforeEach(() => {
   deckGoTo = null
   current = 0
   ;(globalThis as any).window = { slidesApi: {} }
+  configureOfficeHost((globalThis as any).window.slidesApi)
 })
 
 describe('apply_ops', () => {
@@ -97,6 +99,7 @@ describe('apply_ops', () => {
       plan: ['[0] setFill s0/e_1'],
       failures: [{ index: 1, error: 'op "sparkle": unknown op' }],
     }))
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await createSlidesSkill(access()).executeTool!(
       call({ ops: [{ op: 'setFill' }, { op: 'sparkle' }], dry_run: true }),
     )
@@ -115,6 +118,7 @@ describe('apply_ops', () => {
         { index: 0, error: 'op "setFill": no element "ghost" on slide 0. Available: [e_1]' },
       ],
     }))
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await createSlidesSkill(access()).executeTool!(
       call({ ops: [{ op: 'setFill', target: { slide: 0, el: 'ghost' } }] }),
     )
@@ -137,6 +141,7 @@ describe('apply_ops', () => {
         slides: [slide, slide],
       }
     })
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await createSlidesSkill(access()).executeTool!(
       call({
         ops: [
@@ -165,6 +170,7 @@ describe('apply_ops', () => {
       records: [{ op: 'deleteSlide', target: '1' }],
       slides: [slide],
     }))
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await createSlidesSkill(access()).executeTool!(
       call({ ops: [{ op: 'deleteSlide', target: { slide: 1 } }] }),
     )
@@ -175,6 +181,7 @@ describe('apply_ops', () => {
   it('addChart without dataSource is refused before the IPC (figure provenance gate)', async () => {
     const spy = vi.fn()
     ;(globalThis as any).window.slidesApi.applyTxn = spy
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await createSlidesSkill(access()).executeTool!(
       call({
         ops: [
@@ -205,6 +212,7 @@ describe('apply_ops', () => {
         slides: [richSlide],
       }
     })
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await createSlidesSkill(access()).executeTool!(
       call({
         ops: [
@@ -229,6 +237,7 @@ describe('apply_ops', () => {
   it('inserts on a blank deck are redirected to generate_deck (scratch guard)', async () => {
     const spy = vi.fn()
     ;(globalThis as any).window.slidesApi.applyTxn = spy
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await createSlidesSkill(access([slide])).executeTool!(
       call({
         ops: [
@@ -261,6 +270,7 @@ describe('apply_ops', () => {
       ],
       slides: [broken, richSlide],
     }))
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await createSlidesSkill(access([richSlide, richSlide])).executeTool!(
       call({
         ops: [
@@ -282,6 +292,7 @@ describe('apply_ops', () => {
       records: [{ op: 'setHidden', target: '0' }],
       slides: [richSlide],
     }))
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await createSlidesSkill(access()).executeTool!(
       call({ ops: [{ op: 'setHidden', target: { slide: 0 }, hidden: true }] }),
     )
@@ -291,6 +302,7 @@ describe('apply_ops', () => {
   it('empty ops fails fast without touching the IPC', async () => {
     const spy = vi.fn()
     ;(globalThis as any).window.slidesApi.applyTxn = spy
+    configureOfficeHost((window as unknown as { slidesApi: OfficeHost }).slidesApi)
     const r = await createSlidesSkill(access()).executeTool!(call({ ops: [] }))
     expect((r as any).isError).toBe(true)
     expect(spy).not.toHaveBeenCalled()

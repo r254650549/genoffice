@@ -1,3 +1,4 @@
+import { getOfficeHost, type OfficeHost } from './office-host'
 /**
  * Picture crop and cutout (background removal) actions. Extracted from
  * App.tsx; functions read the latest App state through ActionCtx.
@@ -49,7 +50,7 @@ export async function commitCrop(
   // The element frame moves/resizes to the on-screen crop frame in the same atomic
   // edit: the kept region stays exactly where it was framed (PowerPoint semantics),
   // dragging outward restores original content, and one undo reverts everything.
-  const updated = await window.slidesApi.editPictureSrcRect({
+  const updated = await getOfficeHost().editPictureSrcRect({
     slideIndex: ctx.current,
     sourceId,
     srcRect: rect,
@@ -110,7 +111,7 @@ export async function applyCutout(ctx: ActionCtx, pngDataUrl: string): Promise<v
     ctx.setStatus(t('appStatusCutoutEncodeFailed'))
     return
   }
-  const updated = await window.slidesApi.replacePictureBytes({
+  const updated = await getOfficeHost().replacePictureBytes({
     slideIndex: ctx.current,
     sourceId: targetId,
     base64,
@@ -133,9 +134,9 @@ export async function replacePicture(ctx: ActionCtx): Promise<void> {
   const targetId = ctx.selectedIds[0]!
   const node = ctx.slide.nodes.find((n) => n.sourceId === targetId)
   if (!node || node.type !== 'picture') return
-  const picked = await window.slidesApi.pickPictureFile()
+  const picked = await getOfficeHost().pickPictureFile()
   if (!picked) return
-  const updated = await window.slidesApi.replacePictureBytes({
+  const updated = await getOfficeHost().replacePictureBytes({
     slideIndex: ctx.current,
     sourceId: targetId,
     base64: picked.base64,
@@ -173,7 +174,7 @@ export async function saveSelectionAsPicture(
   if (!ctx.slide || !canSaveAsPicture(ctx, sourceIds)) return
   try {
     const pngBase64 = await renderSelectionToPngBase64(ctx.slide, sourceIds, ctx.images)
-    const r = await window.slidesApi.savePicture({
+    const r = await getOfficeHost().savePicture({
       pngBase64,
       defaultName: pictureFileName(ctx, sourceIds),
     })

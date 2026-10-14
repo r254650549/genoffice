@@ -90,7 +90,8 @@ const report = {
   preserved,
   bytes: saved.bytes.length,
   sha256: createHash('sha256').update(saved.bytes).digest('hex'),
-  fontMetrics: 'upstream HeuristicMetrics for engine smoke test; production font host pending',
+  fontMetrics:
+    'upstream HeuristicMetrics for pure engine smoke; original SystemFontMetrics verified separately in service integration',
   browserAccepted: false,
   actualPowerPointAccepted: false,
 }
