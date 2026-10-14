@@ -2001,14 +2001,16 @@ function RibbonInner({
             </button>
             {dropdown === 'file' && (
               <div data-rb-panel="" className="file-menu">
-                <button
-                  onClick={() => {
-                    setDropdown(null)
-                    onOpen()
-                  }}
-                >
-                  {t('ribbonOpen')} <span className="file-menu-key">Ctrl+O</span>
-                </button>
+                {getOfficeHost().kind !== 'web' && (
+                  <button
+                    onClick={() => {
+                      setDropdown(null)
+                      onOpen()
+                    }}
+                  >
+                    {t('ribbonOpen')} <span className="file-menu-key">Ctrl+O</span>
+                  </button>
+                )}
                 <button
                   disabled={!hasDoc}
                   onClick={() => {
@@ -3128,7 +3130,9 @@ function RibbonInner({
                   <span>{t('aiTidyBtn')}</span>
                 </button>
               </div>
-              <div className="ribbon-group-label">{getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}</div>
+              <div className="ribbon-group-label">
+                {getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}
+              </div>
             </div>
 
             <div className="ribbon-sep" />
