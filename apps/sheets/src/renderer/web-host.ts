@@ -7,13 +7,14 @@ let revision=0,published=0,loading=true,tornDown=false,commands=false
 let controls:Parameters<NonNullable<OfficeHost['bindWorkbook']>>[0]|undefined
 let timer:ReturnType<typeof setTimeout>|undefined
 let publishing:Promise<void>=Promise.resolve()
+let saving:Promise<unknown>|undefined
 function notify(method:string,args:unknown[]){window.parent.postMessage({channel,kind:'notify',id:crypto.randomUUID(),method,args,revision},origin)}
 function request(method:string,args:unknown[],captured=revision):Promise<unknown>{const id=crypto.randomUUID();return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error('宿主响应超时，编辑内容已保留。'))},215000);pending.set(id,{resolve,reject,timer});window.parent.postMessage({channel,kind:'request',id,method,args,revision:captured},origin)})}
 function call<K extends keyof DesktopApi>(method:K,args:Parameters<DesktopApi[K]>):ReturnType<DesktopApi[K]>{return request(method,args) as ReturnType<DesktopApi[K]>}
 function subscribe<K extends keyof DesktopApi>(method:K,listener:unknown):ReturnType<DesktopApi[K]>{const callback=listener as (value:unknown)=>void,set=listeners.get(method)??new Set();set.add(callback);listeners.set(method,set);return (()=>{set.delete(callback)}) as ReturnType<DesktopApi[K]>}
 function flush():Promise<void>{
  if(timer)clearTimeout(timer)
- publishing=publishing.catch(()=>{}).then(async()=>{if(tornDown||session.readOnly||revision===published)return;if(!controls)throw new Error('编辑器尚未就绪');if(!await controls.flush())throw new Error('草稿尚未保存，请保持文档打开。')})
+ publishing=publishing.catch(()=>{}).then(async()=>{await saving;if(tornDown||session.readOnly||revision===published)return;if(!controls)throw new Error('编辑器尚未就绪');if(!await controls.flush())throw new Error('草稿尚未保存，请保持文档打开。')})
  return publishing
 }
 window.addEventListener('message',event=>{
@@ -53,7 +54,7 @@ const host:OfficeHost={
   await request('reportMcpResult',[{...result,revision}])
  }finally{commands=false;document.body.inert=false}},
  selectWorkbook:()=>call('selectWorkbook',[]),
- saveWorkbookEdits:async value=>{const captured=revision,result=await call('saveWorkbookEdits',[value]);if(!result.canceled)published=captured;return result},
+ saveWorkbookEdits:value=>{const work=(async()=>{const captured=revision,result=await call('saveWorkbookEdits',[value]);if(!result.canceled)published=captured;return result})();saving=work;void work.finally(()=>{if(saving===work)saving=undefined}).catch(()=>{});return work},
  writeWorkbookRecovery:async value=>{const captured=revision,result=await call('writeWorkbookRecovery',[value]);if(result.ok)published=captured;return result},
  // Explicit DesktopApi bindings are generated once in the fork source, never at build time.
    openSourcePath: (...args) => call('openSourcePath', args),

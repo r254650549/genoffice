@@ -4610,7 +4610,10 @@ export function App({
     // Manual and AI saves take the same gate as the timers: a recovery copy
     // written beside a real save would outlive it as a phantom Restore prompt.
     const gate = saveGateRef.current
-    if (mode === 'recovery' && gate.busy) return { ok: false }
+    // Web flush is an explicit durability acknowledgement (close/backup/Agent),
+    // so queue it behind the whole save, including a cancelled parent dialog.
+    // Desktop periodic recovery remains best-effort and skips a busy save.
+    if (mode === 'recovery' && gate.busy && getOfficeHost()?.kind !== 'web') return { ok: false }
     return gate.run(async () => {
       if (!(await commitActiveEditor())) return { ok: false }
       const web=getOfficeHost()?.kind==='web',inert=document.body.inert

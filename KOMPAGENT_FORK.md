@@ -217,3 +217,17 @@ Slides full Web host checkpoint (2026-10-14):
   reports applied:false rather than a successful mutation. Atomic native batches
   retain upstream validation: references to newly created pages/tables need a
   subsequent batch. No substitute document writer is added for this limitation.
+
+G-04B restored editing acceptance (2026-10-15):
+
+- Sheets Web draft flush waits for an explicit save already awaiting the parent
+  Save As name dialog. After that acknowledgement it rechecks the revision, so
+  the recovery timer does not enter the native save gate concurrently and report
+  a false unsaved-draft error. Newer edits still require their own draft flush.
+  An explicit Web recovery flush also queues behind the complete native save
+  gate, including dialog cancellation; Desktop periodic recovery still skips
+  busy saves.
+- Verified in the parent isolated browser: keep the first-save dialog open past
+  the 1.5-second recovery interval, then confirm a separate test workbook; no
+  draft error, saved cloud version and normal editing. Parent evidence is in
+  docs/plan/evidence/G/2026-10-15/g04b. Original Office files remain intact.
