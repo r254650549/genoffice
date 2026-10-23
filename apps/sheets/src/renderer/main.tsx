@@ -1,3 +1,4 @@
+import {managedOfficeHost} from '../../../../packages/electron-utils/src/managed-renderer'
 import {configureOfficeHost,getOfficeHost} from './office-host'
 import ReactDOM from 'react-dom/client'
 import { htmlDir, htmlLang, type Lang } from '@genoffice/i18n'
@@ -31,7 +32,7 @@ if (import.meta.hot) {
   })
 }
 
-if (!getOfficeHost()) configureOfficeHost(window.desktopApi)
+if (!getOfficeHost()) configureOfficeHost(managedOfficeHost(window.desktopApi))
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Missing application root.')

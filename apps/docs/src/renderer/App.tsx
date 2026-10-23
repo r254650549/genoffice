@@ -784,7 +784,7 @@ export function App() {
   } | null>(null)
   const [_recent, setRecent] = useState<string[]>([])
   const [settings, setSettings] = useState<AiSettings>(DEFAULT_SETTINGS)
-  const [showAi, setShowAi] = useState(() => getOfficeHost().kind !== 'web' && aiPanelInitiallyOpen('aidocs.showAi'))
+  const [showAi, setShowAi] = useState(() => !getOfficeHost().hostManagedAgent && getOfficeHost().kind !== 'web' && aiPanelInitiallyOpen('aidocs.showAi'))
   const [spellcheck, setSpellcheck] = useState(spellcheckEnabled)
   const [largeDocSpellOff, setLargeDocSpellOff] = useState(false)
   const spellcheckActive = spellcheck && !largeDocSpellOff
@@ -1529,7 +1529,7 @@ export function App() {
 
   useEffect(() => {
     void getOfficeHost().getRecentFiles().then(setRecent)
-    const loadSettings = () => void getOfficeHost().getAiSettings().then(setSettings)
+    const loadSettings = () => {if(!getOfficeHost().hostManagedAgent)void getOfficeHost().getAiSettings().then(setSettings)}
     loadSettings()
     return getOfficeHost().onAiSettingsChanged?.(loadSettings)
   }, [])
@@ -1539,7 +1539,7 @@ export function App() {
   }, [showAi])
 
   useEffect(() => {
-    if (getOfficeHost().kind === 'web' && showAi) {
+    if ((getOfficeHost().hostManagedAgent || getOfficeHost().kind === 'web') && showAi) {
       getOfficeHost().openAgent?.(aiPreset?.text)
       setShowAi(false)
     }
@@ -7227,7 +7227,7 @@ export function App() {
       />
 
       <div className="app-main">
-        {doc && getOfficeHost().kind !== 'web' && (
+        {doc && !getOfficeHost().hostManagedAgent && getOfficeHost().kind !== 'web' && (
           <div className={`ai-dock${showAi ? '' : ' collapsed'}`}>
             {/* always mounted: collapse must not drop state or in-flight runs */}
             <AiPanel

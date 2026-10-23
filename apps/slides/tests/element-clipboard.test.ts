@@ -31,43 +31,43 @@ beforeEach(() => {
   }))
 })
 
-describe('element clipboard OS marker', () => {
-  it('only recognizes the exact custom-format token as internal', () => {
+describe('element clipboard OS marker', async () => {
+  it('only recognizes the exact custom-format token as internal', async () => {
     electron.clipboard.readBuffer.mockReturnValue(Buffer.from(token))
-    expect(elementClipboardMarkerMatches(token)).toBe(true)
+    expect(await elementClipboardMarkerMatches(token)).toBe(true)
 
     electron.clipboard.readBuffer.mockReturnValue(Buffer.from(`${token}-other`))
-    expect(elementClipboardMarkerMatches(token)).toBe(false)
+    expect(await elementClipboardMarkerMatches(token)).toBe(false)
   })
 
-  it('recognizes the token in the HTML image marker when custom formats are absent', () => {
+  it('recognizes the token in the HTML image marker when custom formats are absent', async () => {
     electron.clipboard.readHTML.mockReturnValue(
       '<img src="data:image/png;base64,cG5n" data-genoffice-slides-elements="copy-token-1">',
     )
 
-    expect(elementClipboardMarkerMatches(token)).toBe(true)
+    expect(await elementClipboardMarkerMatches(token)).toBe(true)
   })
 
-  it('rejects a stale token and an externally replaced clipboard before image write', () => {
+  it('rejects a stale token and an externally replaced clipboard before image write', async () => {
     electron.clipboard.readBuffer.mockReturnValue(Buffer.from('new-token'))
     const current = { token: 'new-token', senderId: 42 }
 
-    expect(canWriteElementClipboardImage(current, 42, token)).toBe(false)
-    expect(canWriteElementClipboardImage(current, 7, 'new-token')).toBe(false)
-    expect(canWriteElementClipboardImage(current, 42, 'new-token')).toBe(true)
+    expect(await canWriteElementClipboardImage(current, 42, token)).toBe(false)
+    expect(await canWriteElementClipboardImage(current, 7, 'new-token')).toBe(false)
+    expect(await canWriteElementClipboardImage(current, 42, 'new-token')).toBe(true)
 
     electron.clipboard.readBuffer.mockReturnValue(Buffer.from('external-copy'))
-    expect(canWriteElementClipboardImage(current, 42, 'new-token')).toBe(false)
+    expect(await canWriteElementClipboardImage(current, 42, 'new-token')).toBe(false)
   })
 })
 
-describe('element clipboard PNG writer', () => {
-  it('writes normalized PNG and HTML marker in one clipboard operation', () => {
+describe('element clipboard PNG writer', async () => {
+  it('writes normalized PNG and HTML marker in one clipboard operation', async () => {
     const decoded = { isEmpty: () => false, toPNG: () => Buffer.from('normalized-png') }
     electron.nativeImage.createFromBuffer.mockReturnValue(decoded)
     electron.clipboard.readBuffer.mockReturnValue(Buffer.from('copy token'))
 
-    expect(writeElementClipboardImage('copy token', 'cG5n')).toBe(true)
+    expect(await writeElementClipboardImage('copy token', 'cG5n')).toBe(true)
 
     expect(electron.clipboard.write).toHaveBeenCalledOnce()
     expect(electron.clipboard.write).toHaveBeenCalledWith({
@@ -77,7 +77,7 @@ describe('element clipboard PNG writer', () => {
     expect(electron.nativeImage.createFromBuffer).toHaveBeenCalledOnce()
   })
 
-  it('does not overwrite an external copy made while PNG normalization runs', () => {
+  it('does not overwrite an external copy made while PNG normalization runs', async () => {
     electron.clipboard.readBuffer.mockReturnValue(Buffer.from(token))
     electron.nativeImage.createFromBuffer.mockReturnValue({
       isEmpty: () => false,
@@ -87,23 +87,23 @@ describe('element clipboard PNG writer', () => {
       },
     })
 
-    expect(writeElementClipboardImage(token, 'cG5n')).toBe(false)
+    expect(await writeElementClipboardImage(token, 'cG5n')).toBe(false)
     expect(electron.clipboard.write).not.toHaveBeenCalled()
   })
 
-  it('leaves the clipboard untouched for an empty or undecodable PNG', () => {
-    expect(writeElementClipboardImage(token, '')).toBe(false)
-    expect(writeElementClipboardImage(token, 'AA==')).toBe(false)
+  it('leaves the clipboard untouched for an empty or undecodable PNG', async () => {
+    expect(await writeElementClipboardImage(token, '')).toBe(false)
+    expect(await writeElementClipboardImage(token, 'AA==')).toBe(false)
 
     expect(electron.clipboard.write).not.toHaveBeenCalled()
   })
 
-  it('leaves the clipboard untouched when PNG decoding throws', () => {
+  it('leaves the clipboard untouched when PNG decoding throws', async () => {
     electron.nativeImage.createFromBuffer.mockImplementationOnce(() => {
       throw new Error('invalid PNG')
     })
 
-    expect(writeElementClipboardImage(token, 'cG5n')).toBe(false)
+    expect(await writeElementClipboardImage(token, 'cG5n')).toBe(false)
     expect(electron.clipboard.write).not.toHaveBeenCalled()
   })
 })

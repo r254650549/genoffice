@@ -1,5 +1,30 @@
 # KompAgent Office host branch
 
+## Native embedding additions (2026-10-23)
+
+Starting from the parent's fixed `e5826472e35100ef08bd8a2baaa7e518989ce025`
+snapshot, the Desktop host embeds the original DOCX/XLSX/PPTX Electron views.
+`managed-preload` and `managed-renderer` expose an explicit `hostManagedAgent`
+capability: native file/editor APIs remain native while AI entry points route
+to KompAgent's existing chat, approvals and tool runtime. No second model or
+chat service is started, and no private method is patched.
+
+Public additions bind live document controls, commit active cell/text edits,
+snapshot drafts, coordinate save targets, and reject stale native revisions.
+Original editor undo and file serialization remain the implementation.
+The Slides readiness handshake waits for the initial native document to exist;
+binding controls before `newBlank` completed could race a host draft snapshot.
+Managed views disable automatic publication; explicit save uses the original
+native pipeline, and draft recovery remains separate.
+
+The clipboard port supports both the original synchronous Electron clipboard
+and Electron 44's public asynchronous ClipboardItem API. Slides clipboard
+operations now await the port; DOCX image copy retains PNG and HTML in one item.
+The original seven clipboard tests and two modern-port tests pass. Existing
+Web/standalone hosts remain supported through the same public interfaces.
+Parent stage-I evidence records native editing, real model operations, conflicts,
+restart recovery, Windows XLSX Docker cross-compilation and remaining limits.
+
 Upstream: https://github.com/genspark-ai/genoffice.git
 Origin: https://github.com/r254650549/genoffice.git
 Baseline: `fc754f7a90619289942602ebcce68bd57a90515c`.

@@ -1,2 +1,3 @@
+import {managedOfficeHost} from '../../../../packages/electron-utils/src/managed-renderer'
 import { configureOfficeHost } from './office-host'
-configureOfficeHost({ ...window.desktop, kind: 'electron' })
+configureOfficeHost(managedOfficeHost({ ...window.desktop, kind: 'electron' as const }))

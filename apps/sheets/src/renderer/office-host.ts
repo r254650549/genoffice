@@ -1,6 +1,7 @@
 import type {DesktopApi,McpCommandMessage} from '../shared/desktop-api'
 /** Explicit host injection; Electron and Web share the complete native renderer. */
 export interface OfficeHost extends DesktopApi {
+ hostManagedAgent?: boolean
  kind?:'electron'|'web'
  readOnly?:boolean
  workbookLoading?(loading:boolean):void

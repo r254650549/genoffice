@@ -1057,6 +1057,7 @@ export function App({
   /** gsk login state for the cloud-tools gate (refreshed on mount and window focus) */
   const gskLoggedInRef = useRef(false)
   useEffect(() => {
+    if(getOfficeHost().hostManagedAgent)return
     let alive = true
     const refresh = () => {
       void getOfficeHost()
@@ -1150,7 +1151,7 @@ export function App({
   // ── One-time migration: import legacy localStorage history into project-store ──
   useEffect(() => {
     const api = (window as Window & { projectApi?: typeof window.projectApi }).projectApi
-    if (!api) return
+    if (!api || getOfficeHost().hostManagedAgent) return
     const raw = localStorage.getItem(CHAT_STORAGE_KEY)
     if (!raw) return
     try {
@@ -1211,7 +1212,7 @@ export function App({
   // ── project-store: resolve chatId and load history when a workbook opens ──
   useEffect(() => {
     const api = (window as Window & { projectApi?: typeof window.projectApi }).projectApi
-    if (!api) return
+    if (!api || getOfficeHost().hostManagedAgent) return
     const continues = chatContinuesRef.current
     chatContinuesRef.current = false
     const previous = chatRefIdsRef.current
@@ -1721,6 +1722,7 @@ export function App({
   }
 
   useEffect(() => {
+    if(getOfficeHost().hostManagedAgent)return
     const loadSettings = () => void getOfficeHost().getAiSettings().then(setAiSettingsState)
     loadSettings()
     return getOfficeHost().onAiSettingsChanged?.(loadSettings)
@@ -3829,7 +3831,7 @@ export function App({
     // revision history (AI plan applies) is the fallback once it is empty.
     if (lazyWorkbookRef.current || univerHist.canUndo) {
       const api = univerRef.current?.univerAPI
-      if (!api) return
+      if (!api || getOfficeHost().hostManagedAgent) return
       void (async () => {
         for (let step = 0; step < count; step += 1) await api.undo()
         clearInlineUndo()
@@ -4613,10 +4615,10 @@ export function App({
     // Web flush is an explicit durability acknowledgement (close/backup/Agent),
     // so queue it behind the whole save, including a cancelled parent dialog.
     // Desktop periodic recovery remains best-effort and skips a busy save.
-    if (mode === 'recovery' && gate.busy && getOfficeHost()?.kind !== 'web') return { ok: false }
+    if (mode === 'recovery' && gate.busy && !getOfficeHost()?.hostManagedAgent && getOfficeHost()?.kind !== 'web') return { ok: false }
     return gate.run(async () => {
       if (!(await commitActiveEditor())) return { ok: false }
-      const web=getOfficeHost()?.kind==='web',inert=document.body.inert
+      const web=getOfficeHost()?.hostManagedAgent||getOfficeHost()?.kind==='web',inert=document.body.inert
       if(web)document.body.inert=true
       try{return await handleSaveImpl(saveContext(), mode, quiet, explicitTarget)}finally{if(web)document.body.inert=inert}
     })

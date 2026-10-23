@@ -1,3 +1,4 @@
+import {nativeClipboardPort} from '../../../../packages/electron-utils/src/clipboard-port'
 import { deckDefaultFont } from './session-document'
 import { registerSlidesDocumentHandlers } from './document-handlers'
 /**
@@ -449,6 +450,20 @@ export async function saveSessionDeckTo(session: Session, filePath: string): Pro
   syncAttachedPaths(session, filePath)
   commitSaved(session.opened)
   if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
+}
+
+/** Live draft export for an embedding host. No identity or saved-state mutation. */
+export async function snapshotSlidesView(wcId: number): Promise<Uint8Array> {
+  const session = sessions.get(wcId)
+  if (!session) throw new Error('OFFICE_NOT_READY')
+  return savePptx(session.opened)
+}
+
+export async function saveSlidesViewTo(wcId: number, path: string) {
+  const session = sessions.get(wcId)
+  if (!session) throw new Error('OFFICE_NOT_READY')
+  await saveSessionDeckTo(session, path)
+  return {ok:true, path, slides:buildAllRenderSlides(session.opened, session.fitWidthPx)}
 }
 
 const RECENT_PATH = () => join(app.getPath('userData'), 'slides-recent.json')
@@ -940,7 +955,7 @@ export function registerSlidesIpc(): void {
   documentHandlers = registerSlidesDocumentHandlers(ipcMain, sessions, documentRuntime, {
     dialog,
     dialogParent,
-    clipboard,
+    clipboard:nativeClipboardPort(),
     nativeImage,
     showOpenDialogWithMemory,
     readFile,

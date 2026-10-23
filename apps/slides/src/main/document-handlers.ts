@@ -1,3 +1,4 @@
+import type {nativeClipboardPort} from '../../../../packages/electron-utils/src/clipboard-port'
 /** Original native Slides IPC document handlers. Both hosts register these same callbacks. */
 import type { Dialog, Clipboard, NativeImage, BrowserWindow } from 'electron'
 import type { readFile as readFileType } from 'node:fs/promises'
@@ -169,7 +170,7 @@ export interface SlidesDocumentRegistrar {
 export interface SlidesDocumentPorts {
   dialog: Dialog
   dialogParent(): BrowserWindow | undefined
-  clipboard: Clipboard
+  clipboard: ReturnType<typeof nativeClipboardPort>
   nativeImage: {
     createFromBuffer(bytes: Buffer): NativeImage
     createFromPath(path: string): NativeImage
@@ -1147,7 +1148,7 @@ export function registerSlidesDocumentHandlers(
   })
 
   // App-wide, so a slide copied in one tab can be pasted into another deck.
-  ipcMain.handle('slides:copy-slides', (e, op: CopySlidesOp) => {
+  ipcMain.handle('slides:copy-slides', async (e, op: CopySlidesOp) => {
     const session = sessions.get(e.sender.id)
     if (!session || !op.slideIndexes.length) return false
     const bundles: SlideBundle[] = []
@@ -1159,7 +1160,7 @@ export function registerSlidesDocumentHandlers(
     const pngs = op.pngs?.length === bundles.length ? op.pngs : undefined
     slideClipboard = { bundles, ...(pngs ? { pngs } : {}) }
     // Marker so plain ⌘V knows the latest copy was a slide (element copies / external copies overwrite it)
-    clipboard.writeBuffer('io.genoffice.slides.slide', Buffer.from('1'))
+    await clipboard.writeBuffer('io.genoffice.slides.slide', Buffer.from('1'))
     return true
   })
 
@@ -2025,34 +2026,34 @@ export function registerSlidesDocumentHandlers(
 
   // Our marker still present = the last copy came from this app -> use internal element paste
   // (on macOS custom formats don't appear in availableFormats, so check via readBuffer)
-  const clipboardMarker = (format: string) => {
+  const clipboardMarker = async (format: string) => {
     try {
-      return clipboard.readBuffer(format).length > 0
+      return (await clipboard.readBuffer(format)).length > 0
     } catch {
       return false
     }
   }
 
-  ipcMain.handle('slides:clipboard-external', () => {
-    if (slideClipboard && clipboardMarker('io.genoffice.slides.slide')) return { kind: 'slide' }
-    if (elementClipboard && elementClipboardMarkerMatches(elementClipboard.token))
+  ipcMain.handle('slides:clipboard-external', async () => {
+    if (slideClipboard && await clipboardMarker('io.genoffice.slides.slide')) return { kind: 'slide' }
+    if (elementClipboard && await elementClipboardMarkerMatches(elementClipboard.token))
       return { kind: 'internal' }
-    const img = clipboard.readImage()
+    const img = await clipboard.readImage()
     if (!img.isEmpty()) return { kind: 'image', base64: img.toPNG().toString('base64'), ext: 'png' }
-    const text = clipboard.readText()
+    const text = await clipboard.readText()
     if (text.trim()) return { kind: 'text', text }
     return { kind: 'none' }
   })
 
   // Menu-enable probe: is there anything a paste would act on? (no image decode)
-  ipcMain.handle('slides:clipboard-probe', () => {
-    if (slideClipboard && clipboardMarker('io.genoffice.slides.slide')) return true
-    if (elementClipboard && elementClipboardMarkerMatches(elementClipboard.token)) return true
-    if (clipboard.availableFormats().some((f) => f.startsWith('image/'))) return true
-    return clipboard.readText().trim().length > 0
+  ipcMain.handle('slides:clipboard-probe', async () => {
+    if (slideClipboard && await clipboardMarker('io.genoffice.slides.slide')) return true
+    if (elementClipboard && await elementClipboardMarkerMatches(elementClipboard.token)) return true
+    if ((await clipboard.availableFormats()).some((f) => f.startsWith('image/'))) return true
+    return (await clipboard.readText()).trim().length > 0
   })
 
-  ipcMain.handle('slides:copy-elements', (e, op: CopyElementsOp) => {
+  ipcMain.handle('slides:copy-elements', async (e, op: CopyElementsOp) => {
     const session = sessions.get(e.sender.id)
     if (!session) return 0
     const slide = session.opened.deck.slides[op.slideIndex]
@@ -2070,13 +2071,13 @@ export function registerSlidesDocumentHandlers(
         senderId: e.sender.id,
       }
       // Write our marker to the OS clipboard: an external copy overwrites it, so at paste time it tells whether internal or external is newer
-      clipboard.writeBuffer(ELEMENT_CLIPBOARD_FORMAT, Buffer.from(token))
+      await clipboard.writeBuffer(ELEMENT_CLIPBOARD_FORMAT, Buffer.from(token))
     }
     return items.length
   })
 
-  ipcMain.handle('slides:copy-elements-image', (e, clipboardToken: string, pngBase64: string) => {
-    if (!canWriteElementClipboardImage(elementClipboard, e.sender.id, clipboardToken)) return false
+  ipcMain.handle('slides:copy-elements-image', async (e, clipboardToken: string, pngBase64: string) => {
+    if (!await canWriteElementClipboardImage(elementClipboard, e.sender.id, clipboardToken)) return false
     return writeElementClipboardImage(clipboardToken, pngBase64)
   })
 

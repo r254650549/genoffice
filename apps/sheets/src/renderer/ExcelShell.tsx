@@ -549,7 +549,7 @@ export function ExcelShell({
   })
   // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
   const [isCopilotOpen, setIsCopilotOpen] = useState(() =>
-    getOfficeHost()?.kind==='web'?false:aiPanelInitiallyOpen('ai-sheets-show-ai'),
+    (getOfficeHost()?.hostManagedAgent||getOfficeHost()?.kind==='web')?false:aiPanelInitiallyOpen('ai-sheets-show-ai'),
   )
   useEffect(() => {
     rememberAiPanelOpen('ai-sheets-show-ai', isCopilotOpen)
@@ -823,7 +823,7 @@ export function ExcelShell({
 
   return (
     <main
-      className={`app-shell ${isCopilotOpen ? '' : 'copilot-collapsed'} ${getOfficeHost()?.kind==='web'?'office-web':''}`}
+      className={`app-shell ${isCopilotOpen ? '' : 'copilot-collapsed'} ${(getOfficeHost()?.hostManagedAgent||getOfficeHost()?.kind==='web')?'office-web':''}`}
       inert={openingWorkbook}
       aria-busy={openingWorkbook}
     >
@@ -934,18 +934,18 @@ export function ExcelShell({
           onIsSelectionInPivot={onIsSelectionInPivot}
           onCommand={dispatchCommand}
           onAiRun={(nextPrompt) => {
-            if(getOfficeHost()?.kind==='web'){getOfficeHost().openAgent?.(nextPrompt);return}
+            if((getOfficeHost()?.hostManagedAgent||getOfficeHost()?.kind==='web')){getOfficeHost().openAgent?.(nextPrompt);return}
             setIsCopilotOpen(true)
             onSend(nextPrompt)
           }}
           aiOpen={isCopilotOpen}
-          onAiToggle={() => getOfficeHost()?.kind==='web'?getOfficeHost().openAgent?.():setIsCopilotOpen((open) => !open)}
+          onAiToggle={() => (getOfficeHost()?.hostManagedAgent||getOfficeHost()?.kind==='web')?getOfficeHost().openAgent?.():setIsCopilotOpen((open) => !open)}
         />
       </header>
 
       {/* AI panel docks on the left, full height under the ribbon (unified with docs) */}
       <div className="sheet-body">
-        {getOfficeHost()?.kind!=='web'&&<AiChatPanel
+        {!getOfficeHost()?.hostManagedAgent&&getOfficeHost()?.kind!=='web'&&<AiChatPanel
           isOpen={isCopilotOpen}
           hasContent={sheetHasContent}
           chat={chat}
@@ -1004,7 +1004,7 @@ export function ExcelShell({
               range={aiScopeRange}
               onDismiss={onAiSelectionAskDismiss}
               onSend={(instruction) => {
-                if(getOfficeHost()?.kind==='web'){getOfficeHost().openAgent?.(instruction);return}
+                if((getOfficeHost()?.hostManagedAgent||getOfficeHost()?.kind==='web')){getOfficeHost().openAgent?.(instruction);return}
                 setIsCopilotOpen(true)
                 onSend(instruction)
               }}

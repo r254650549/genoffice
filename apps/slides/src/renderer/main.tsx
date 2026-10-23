@@ -1,3 +1,4 @@
+import {managedOfficeHost} from '../../../../packages/electron-utils/src/managed-renderer'
 import { configureOfficeHost, getOfficeHost, type OfficeHost } from './office-host'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
@@ -20,7 +21,7 @@ import '@genoffice/ui/ai-scope-quote.css'
 import './styles.css'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
 
-if (import.meta.env.MODE !== 'office-web') configureOfficeHost(window.slidesApi)
+if (import.meta.env.MODE !== 'office-web') configureOfficeHost(managedOfficeHost(window.slidesApi))
 installScreenTips()
 
 // Canvas fillText never triggers @font-face downloads, so the bundled document fonts

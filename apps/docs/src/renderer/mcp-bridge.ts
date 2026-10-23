@@ -46,7 +46,7 @@ export function installMcpBridge(deps: McpBridgeDeps): () => void {
     if (!message || typeof message.requestId !== 'string') return
     queue = queue.then(async () => {
       try {
-        desktop.beforeMcpCommand?.(message)
+        await desktop.beforeMcpCommand?.(message)
         const result = await runDocumentCommand(deps, message.command, message.payload)
         await desktop.reportMcpResult({ requestId: message.requestId, ok: true, result })
       } catch (error) {

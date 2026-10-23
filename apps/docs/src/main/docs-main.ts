@@ -1,3 +1,4 @@
+import {nativeClipboardPort} from '../../../../packages/electron-utils/src/clipboard-port'
 import { createHash, randomUUID } from 'node:crypto'
 import { handOffBytes } from './byte-handoff'
 import {
@@ -5021,7 +5022,7 @@ export function registerDocsIpc(): void {
           /* malformed payload: plain img */
         }
       }
-      clipboard.write({
+      await nativeClipboardPort().write({
         image,
         html: `<img src="${htmlSrc}" width="${width}" height="${height}"${metaAttr}>`,
       })

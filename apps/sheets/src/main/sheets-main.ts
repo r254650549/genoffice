@@ -3985,6 +3985,16 @@ export function resolveSheetsSessionPath(senderId: number, sessionId: string): s
   return sheetsTabs.get(senderId)?.sessions.get(sessionId)?.path ?? null
 }
 
+/** Snapshot after the renderer flushes its live edit journal. Does not publish or reset dirty. */
+export async function snapshotSheetsView(senderId: number): Promise<Buffer> {
+  const tab = sheetsTabs.get(senderId)
+  const current = tab && [...tab.sessions.values()].at(-1)
+  if (!current) throw new Error('OFFICE_NOT_READY')
+  const key = current.unsavedNew ? current.suggestSaveAs! : current.emptySource ? (current.restoreTarget ?? current.path) : current.path
+  const recovery = recoveryPathFor(key)
+  return readFile(existsSync(recovery) ? recovery : current.path)
+}
+
 /**
  * Resolve a save request's sheet ops / name mappings and write the workbook through
  * the sidecar. Split out of the save handler so a crash-recovery copy can reuse the

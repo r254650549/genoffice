@@ -3,9 +3,9 @@ export const ELEMENT_CLIPBOARD_FORMAT = 'io.genoffice.slides.elements'
 export type ElementClipboardIdentity = { token: string; senderId: number }
 export interface ClipboardImagePort {
   clipboard: {
-    readBuffer(format: string): Buffer
-    readHTML(): string
-    write(value: { image: any; html: string }): void
+    readBuffer(format: string): Buffer | Promise<Buffer>
+    readHTML(): string | Promise<string>
+    write(value: { image: any; html: string }): void | Promise<void>
   }
   nativeImage: { createFromBuffer(bytes: Buffer): { isEmpty(): boolean; toPNG(): Buffer } }
 }
@@ -17,20 +17,18 @@ export function createElementClipboard({ clipboard, nativeImage }: ClipboardImag
     return typeof value === 'string' && value.length > 0 && value.length <= MAX_TOKEN_LENGTH
   }
 
-  function markerBufferMatches(token: string): boolean {
+  async function markerBufferMatches(token: string): Promise<boolean> {
     try {
-      return clipboard.readBuffer(ELEMENT_CLIPBOARD_FORMAT).equals(Buffer.from(token))
+      return (await clipboard.readBuffer(ELEMENT_CLIPBOARD_FORMAT)).equals(Buffer.from(token))
     } catch {
       return false
     }
   }
 
-  function markerHtmlMatches(token: string): boolean {
+  async function markerHtmlMatches(token: string): Promise<boolean> {
     try {
       const encodedToken = encodeURIComponent(token)
-      const images = clipboard
-        .readHTML()
-        .matchAll(/<img\b[^>]*\bdata-genoffice-slides-elements\s*=\s*"([^"]*)"[^>]*>/gi)
+      const images = (await clipboard.readHTML()).matchAll(/<img\b[^>]*\bdata-genoffice-slides-elements\s*=\s*"([^"]*)"[^>]*>/gi)
       return [...images].some((match) => match[1] === encodedToken)
     } catch {
       return false
@@ -38,23 +36,23 @@ export function createElementClipboard({ clipboard, nativeImage }: ClipboardImag
   }
 
   /** Whether the OS clipboard still belongs to the supplied element-copy token. */
-  function elementClipboardMarkerMatches(token: string): boolean {
+  async function elementClipboardMarkerMatches(token: string): Promise<boolean> {
     return (
-      isElementClipboardToken(token) && (markerBufferMatches(token) || markerHtmlMatches(token))
+      isElementClipboardToken(token) && (await markerBufferMatches(token) || await markerHtmlMatches(token))
     )
   }
 
   /** Prevent a delayed renderer PNG from replacing a later copy or an external clipboard change. */
-  function canWriteElementClipboardImage(
+  async function canWriteElementClipboardImage(
     current: ElementClipboardIdentity | null,
     senderId: number,
     token: unknown,
-  ): token is string {
+  ): Promise<boolean> {
     return (
       isElementClipboardToken(token) &&
       current?.senderId === senderId &&
       current.token === token &&
-      elementClipboardMarkerMatches(token)
+      await elementClipboardMarkerMatches(token)
     )
   }
 
@@ -73,7 +71,7 @@ export function createElementClipboard({ clipboard, nativeImage }: ClipboardImag
   }
 
   /** Writes a standard image and an HTML marker together so external apps can paste the image. */
-  function writeElementClipboardImage(token: string, pngBase64: unknown): boolean {
+  async function writeElementClipboardImage(token: string, pngBase64: unknown): Promise<boolean> {
     if (!isElementClipboardToken(token)) return false
     const bytes = decodePngBase64(pngBase64)
     if (!bytes) return false
@@ -83,8 +81,8 @@ export function createElementClipboard({ clipboard, nativeImage }: ClipboardImag
       const normalizedPng = decoded.toPNG()
       if (!normalizedPng.length) return false
       const html = `<img src="data:image/png;base64,${normalizedPng.toString('base64')}" data-genoffice-slides-elements="${encodeURIComponent(token)}">`
-      if (!elementClipboardMarkerMatches(token)) return false
-      clipboard.write({ image: decoded, html })
+      if (!await elementClipboardMarkerMatches(token)) return false
+      await clipboard.write({ image: decoded, html })
       return true
     } catch {
       return false

@@ -477,7 +477,7 @@ export function App() {
     getOfficeHost().setAutoSavePref?.(autoSave)
   }, [autoSave])
   const [showAi, setShowAi] = useState(
-    () => getOfficeHost().kind !== 'web' && aiPanelInitiallyOpen('ai-slides-show-ai'),
+    () => !getOfficeHost().hostManagedAgent && getOfficeHost().kind !== 'web' && aiPanelInitiallyOpen('ai-slides-show-ai'),
   )
   const [showFormat, setShowFormat] = useState(false)
   const [showBgFormat, setShowBgFormat] = useState(false)
@@ -941,6 +941,9 @@ export function App() {
   )
 
   useEffect(() => {
+    // Binding controls is also the embedding host's readiness handshake. Wait
+    // for the initial native open/new-blank result before accepting snapshots.
+    if (!hasDoc) return
     getOfficeHost().bindPresentation?.({
       flush: async () => {
         await fileActions.flushActiveEdit(ctxRef.current)
@@ -957,7 +960,7 @@ export function App() {
         setDirty(state.dirty)
       },
     })
-  }, [save])
+  }, [save, hasDoc])
 
   // Close guard (closing tab/window) chose "Save": run the full save flow and report the result
   useEffect(() => {
@@ -1304,6 +1307,7 @@ export function App() {
   )
 
   useEffect(() => {
+    if(getOfficeHost().hostManagedAgent)return
     const loadSettings = () => void getOfficeHost().getAiSettings().then(setAiSettings)
     loadSettings()
     return getOfficeHost().onAiSettingsChanged?.(loadSettings)
@@ -1315,7 +1319,7 @@ export function App() {
   }, [slides.length])
 
   const toggleAi = useCallback(() => {
-    if (getOfficeHost().kind === 'web') {
+    if (getOfficeHost().hostManagedAgent || getOfficeHost().kind === 'web') {
       getOfficeHost().openAgent?.()
       return
     }
@@ -1334,7 +1338,7 @@ export function App() {
       slideShot?: boolean,
       scope?: AiScopeQuoteData,
     ) => {
-      if (getOfficeHost().kind === 'web') {
+      if (getOfficeHost().hostManagedAgent || getOfficeHost().kind === 'web') {
         getOfficeHost().openAgent?.(text)
         return
       }
@@ -1459,7 +1463,7 @@ export function App() {
       const state = askState
       setAskState(null)
       if (!state) return
-      if (getOfficeHost().kind === 'web') {
+      if (getOfficeHost().hostManagedAgent || getOfficeHost().kind === 'web') {
         getOfficeHost().openAgent?.(instruction)
         return
       }
@@ -3610,7 +3614,7 @@ export function App() {
       />
 
       <div className="app-main">
-        {getOfficeHost().kind !== 'web' &&
+        {!getOfficeHost().hostManagedAgent && getOfficeHost().kind !== 'web' &&
           slide &&
           viewMode !== 'reading' &&
           viewMode !== 'sorter' && (

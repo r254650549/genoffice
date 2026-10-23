@@ -7,7 +7,8 @@ export interface PresentationControls {
   apply(state: { slides: RenderSlide[]; dirty: boolean }): void
 }
 export interface OfficeHost extends SlidesApi {
-  kind?: 'electron' | 'web'
+  hostManagedAgent?: boolean
+ kind?: 'electron' | 'web'
   readOnly?: boolean
   bindPresentation?(controls: PresentationControls): void
   openAgent?(prompt?: string): void
