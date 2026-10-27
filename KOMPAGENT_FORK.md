@@ -256,3 +256,17 @@ G-04B restored editing acceptance (2026-10-15):
   the 1.5-second recovery interval, then confirm a separate test workbook; no
   draft error, saved cloud version and normal editing. Parent evidence is in
   docs/plan/evidence/G/2026-10-15/g04b. Original Office files remain intact.
+
+Desktop content recovery (2026-10-27):
+
+- Teardown still revokes all grants and recovery timers, but does not send IPC
+  into a crashed DOCX frame. This avoids a disposed-frame error while closing
+  or recreating that one editor; it does not skip cleanup or affect other tabs.
+- Slides refresh notes after the existing deck-change notification. Main/MCP
+  transactions already broadcast the render tree, but notes are separate from
+  RenderSlide and otherwise stayed stale until a slide switch. The existing
+  pending-note flush and conflict protection remain in place.
+- Parent scripted tests cover real renderer crashes, same-kind independent
+  processes, unrelated note/drawing/document access, normal window close, and
+  saved source versus private recovery snapshots. No second Agent or renderer
+  replacement is introduced.

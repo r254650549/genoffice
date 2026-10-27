@@ -3465,7 +3465,7 @@ export function teardownDocsRenderer(contents: WebContents): void {
   pdfWritablePaths.delete(contents.id)
   docDiskStates.delete(contents.id)
   forgetDocPasswords(contents.id)
-  if (!contents.isDestroyed()) contents.send('docs:teardown')
+  if (!contents.isDestroyed() && !contents.isCrashed()) contents.send('docs:teardown')
 }
 
 // ── Crash recovery: dirty renderers push a copy every 30s

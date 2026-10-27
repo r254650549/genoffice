@@ -983,6 +983,8 @@ export function App() {
     () =>
       getOfficeHost().onDeckChanged?.(({ slides: all }) => {
         setSlides(all)
+        // Main-process/MCP changes also update notes, which are outside RenderSlide.
+        setAnnotationsNonce((n) => n + 1)
         setCurrent((c) => Math.min(c, Math.max(0, all.length - 1)))
         // The broadcast also fires for undo back to a clean state — ask the
         // session instead of assuming the change dirtied it
