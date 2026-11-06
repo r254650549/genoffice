@@ -1,3 +1,4 @@
+import { OfficeAgentMark, officeAgentName } from '@genoffice/ui'
 import {getOfficeHost} from '../office-host'
 import {
   aiPanelWidthAtPointer,
@@ -482,7 +483,11 @@ export function AiChatPanel({
           data-tip={t('aiOpenAssistant')}
           aria-label={t('aiOpenAssistant')}
         >
-          <GensparkMark size={22} />
+          <OfficeAgentMark
+            host={getOfficeHost()}
+            size={22}
+            fallback={<GensparkMark size={22} />}
+          />
         </button>
       </aside>
     )
@@ -562,12 +567,16 @@ export function AiChatPanel({
         onPointerDown={startResize}
         role="separator"
         aria-orientation="vertical"
-        aria-label={t('aiGensparkAccount')}
+        aria-label={officeAgentName(getOfficeHost(), t('aiGensparkAccount'))}
       />
       <header className="ai-panel-header">
         <span className="ai-panel-title">
-          <GensparkMark size={22} />
-          Genspark
+          <OfficeAgentMark
+            host={getOfficeHost()}
+            size={22}
+            fallback={<GensparkMark size={22} />}
+          />
+          {officeAgentName(getOfficeHost(), 'Genspark')}
         </span>
         <div className="ai-panel-header-actions">
           <AiPanelSideButton

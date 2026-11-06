@@ -1,3 +1,4 @@
+import { OfficeAgentMark, officeAgentName } from '@genoffice/ui'
 import { getOfficeHost, type OfficeHost } from './../office-host'
 /** Home tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import { useState } from 'react'
@@ -230,16 +231,20 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
   }
   return (
     <>
-      <Group label={getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}>
+      <Group label={officeAgentName(getOfficeHost())}>
         <button
           className={`rb-big ai-entry${aiOpen ? ' active' : ''}`}
           data-tip={t('aiOpenAssistant')}
           onClick={onToggleAi}
         >
           <span className="rb-big-icon">
-            <GensparkMark size={26} />
+            <OfficeAgentMark
+              host={getOfficeHost()}
+              size={26}
+              fallback={<GensparkMark size={26} />}
+            />
           </span>
-          <span>{getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}</span>
+          <span>{officeAgentName(getOfficeHost())}</span>
         </button>
         <button
           className="rb-big ai-entry"

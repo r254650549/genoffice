@@ -1,3 +1,4 @@
+import { OfficeAgentMark, officeAgentName } from '@genoffice/ui'
 import { getOfficeHost, type OfficeHost } from './office-host'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
@@ -3667,7 +3668,11 @@ export function App() {
                   data-tip={t('appAiRailExpand')}
                   aria-label={t('appAiRailExpand')}
                 >
-                  <GensparkMark size={22} />
+                  <OfficeAgentMark
+                    host={getOfficeHost()}
+                    size={22}
+                    fallback={<GensparkMark size={22} />}
+                  />
                 </button>
               )}
             </div>
@@ -4010,9 +4015,13 @@ export function App() {
                               data-tip={t('aiOpenAssistant')}
                               onClick={toggleAi}
                             >
-                              <GensparkMark size={14} />
+                              <OfficeAgentMark
+                                host={getOfficeHost()}
+                                size={14}
+                                fallback={<GensparkMark size={14} />}
+                              />
                               <span>
-                                {getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}
+                                {officeAgentName(getOfficeHost())}
                               </span>
                             </button>
                             {/* Same one-click presets as the Home tab; hidden instead of

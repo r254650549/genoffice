@@ -1,3 +1,4 @@
+import { OfficeAgentMark, officeAgentName } from '@genoffice/ui'
 import { getOfficeHost, type OfficeHost } from './../office-host'
 import {
   aiPanelWidthAtPointer,
@@ -2156,7 +2157,11 @@ export function AiPanel({
         aria-label={t('appAiRailExpand')}
         onClick={onExpand}
       >
-        <GensparkMark size={22} />
+        <OfficeAgentMark
+          host={getOfficeHost()}
+          size={22}
+          fallback={<GensparkMark size={22} />}
+        />
       </button>
     )
   }
@@ -2184,12 +2189,16 @@ export function AiPanel({
         onPointerDown={startResize}
         role="separator"
         aria-orientation="vertical"
-        aria-label={t('aiPanelTitle')}
+        aria-label={officeAgentName(getOfficeHost(), t('aiPanelTitle'))}
       />
       <div className="ai-panel-header">
         <span className="ai-panel-title">
-          <GensparkMark size={22} />
-          {t('aiPanelTitle')}
+          <OfficeAgentMark
+            host={getOfficeHost()}
+            size={22}
+            fallback={<GensparkMark size={22} />}
+          />
+          {officeAgentName(getOfficeHost(), t('aiPanelTitle'))}
         </span>
         <div className="ai-panel-header-actions">
           <AiPanelSideButton

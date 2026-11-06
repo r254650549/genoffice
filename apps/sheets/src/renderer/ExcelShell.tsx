@@ -1,3 +1,4 @@
+import { OfficeAgentMark, officeAgentName } from '@genoffice/ui'
 import {getOfficeHost} from './office-host'
 import type { IFunctionInfo } from '@univerjs/engine-formula'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -3335,10 +3336,14 @@ function Ribbon({
           onClick={onAiToggle}
         >
           <span className="tool-icon-row">
-            <GensparkMark size={26} />
+            <OfficeAgentMark
+              host={getOfficeHost()}
+              size={26}
+              fallback={<GensparkMark size={26} />}
+            />
           </span>
           <span>
-            <strong>Genspark AI</strong>
+            <strong>{officeAgentName(getOfficeHost())}</strong>
           </span>
         </button>
         <button

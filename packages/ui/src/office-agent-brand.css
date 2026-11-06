@@ -1,0 +1,9 @@
+[data-theme='dark'] .office-host-agent-mark {
+  filter: brightness(0) invert(1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='dark']) .office-host-agent-mark {
+    filter: brightness(0) invert(1);
+  }
+}

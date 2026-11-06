@@ -1,3 +1,4 @@
+import { OfficeAgentMark, officeAgentName } from '@genoffice/ui'
 import { getOfficeHost } from '../office-host'
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -3028,9 +3029,13 @@ function RibbonInner({
                   onClick={onToggleAi}
                 >
                   <span className="rb-big-icon">
-                    <GensparkMark size={26} />
+                    <OfficeAgentMark
+                      host={getOfficeHost()}
+                      size={26}
+                      fallback={<GensparkMark size={26} />}
+                    />
                   </span>
-                  <span>{getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}</span>
+                  <span>{officeAgentName(getOfficeHost())}</span>
                 </button>
                 <button
                   className="rb-big ai-entry"
@@ -3131,7 +3136,7 @@ function RibbonInner({
                 </button>
               </div>
               <div className="ribbon-group-label">
-                {getOfficeHost().kind === 'web' ? 'kompagent AI' : 'Genspark AI'}
+                {officeAgentName(getOfficeHost())}
               </div>
             </div>
 

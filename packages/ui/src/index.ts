@@ -1,4 +1,10 @@
 export { AiPanelSideButton } from './AiPanelSideButton'
+export {
+  OfficeAgentMark,
+  officeAgentName,
+  isKompAgentOfficeHost,
+  type OfficeAgentBrandHost,
+} from './office-agent-brand'
 export { AiComposer } from './AiComposer'
 export { AiQueueStrip } from './AiQueueStrip'
 export { useChatRunQueue, type ChatRunQueue, type QueuedChatMessage } from './chat-run-queue'
